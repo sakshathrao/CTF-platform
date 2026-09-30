@@ -1,0 +1,71 @@
+body {
+  all: unset;
+}
+
+div {
+  all: unset;
+}
+
+.main_bg {
+  min-height: 100vh;
+  min-width: 100vw;
+
+  background-image: url("assets/file_00000000bd7c81f4aafde805674aabef_upscayl_2x_upscayl-standard-4x.png");
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: center;
+
+  backdrop-filter: lighten(2.5);
+
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  flex-direction: column;
+  gap: 30px;
+
+  padding-left: 210px;
+
+}
+
+h1 {
+  all: unset;
+  font-family: Jost;
+  background: linear-gradient(181deg, #e5e7eb 30%, #9ca3af, #779399 75%);
+  background-clip: text;
+  color: transparent;
+  font-size: 130px;
+  font-weight: 400;
+  letter-spacing: -4px;
+  /* position: absolute; */
+  /* top: 270px; */
+  /* left: 210px; */
+
+  transform: scaleY(0.9) scaleX(1.08);
+  transform-origin: left center;
+
+}
+
+h1::after {
+  content: "";
+  display: block;
+  width: 60px;
+  height: 4px;
+  background: linear-gradient(90deg, #f2e7c9, transparent);
+  margin-top: 8px;
+  margin-left: 5px;
+}
+
+.subtitle {
+  all: unset;
+  font-family: Jost;
+  background: linear-gradient(-170deg, #e5e7eb 50%, #9ca3af, #bfa3a0 90%);
+  background-clip: text;
+  color: transparent;
+  font-size: 40px;
+  font-weight: 200;
+  letter-spacing: -2px;
+  /* position: absolute; */
+  font-weight: 200;
+  /* top: 445px; */
+  /* left: 190px; */
+}

@@ -1,13 +1,14 @@
-import { WebSocketServer } from "ws";
+import WebSocket, { WebSocketServer } from "ws";
 
 const wss = new WebSocketServer({
+    host: "0.0.0.0",
     port: 8080
 });
 
 let state = {
-    title: "Hello there!",
-    message: "Welcome to the website.",
-    layout: "default"
+    // title: "Hello there!",
+    // message: "Welcome to the website.",
+    layout: "wait"
 };
 
 wss.on("connection", socket => {

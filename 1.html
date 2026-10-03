@@ -1,15 +1,37 @@
 <!DOCTYPE html>
-<html>
 
 <head>
-  <title> CTF </title>
+  <title>Challenge 1</title>
   <link rel="stylesheet" href="main.css">
 </head>
 
-<body>
-  <div class="main_bg">
-    <h1> The challenge page. </h1>
-  </div>
-</body>
+<script src="./node_modules/v86/build/libv86.js"></script>
+<script>
+  "use strict";
 
-</html>
+  window.onload = function () {
+    var emulator = window.emulator = new V86({
+      wasm_path: "./node_modules/v86/build/v86.wasm",
+      memory_size: 32 * 1024 * 1024,
+      vga_memory_size: 2 * 1024 * 1024,
+      screen_container: document.getElementById("screen_container"),
+      bios: {
+        url: "./seabios.bin",
+      },
+      vga_bios: {
+        url: "./vgabios.bin",
+      },
+      cdrom: {
+        url: "./linux.iso",
+      },
+      autostart: true,
+    });
+  }
+</script>
+
+<div class="main_bg">
+  <div id="screen_container">
+    <div style="white-space: pre; font: 14px monospace; line-height: 14px"></div>
+    <canvas style="display: none"></canvas>
+  </div>
+</div>

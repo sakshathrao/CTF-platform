@@ -1,37 +1,106 @@
 <!DOCTYPE html>
+<html>
 
 <head>
   <title>Challenge 1</title>
   <link rel="stylesheet" href="main.css">
 </head>
 
-<script src="./node_modules/v86/build/libv86.js"></script>
-<script>
-  "use strict";
+<body>
 
-  window.onload = function () {
-    var emulator = window.emulator = new V86({
-      wasm_path: "./node_modules/v86/build/v86.wasm",
-      memory_size: 32 * 1024 * 1024,
-      vga_memory_size: 2 * 1024 * 1024,
-      screen_container: document.getElementById("screen_container"),
-      bios: {
-        url: "./seabios.bin",
-      },
-      vga_bios: {
-        url: "./vgabios.bin",
-      },
-      cdrom: {
-        url: "./linux.iso",
-      },
-      autostart: true,
-    });
-  }
-</script>
+  <div class="main_bg">
 
-<div class="main_bg">
-  <div id="screen_container">
-    <div style="white-space: pre; font: 14px monospace; line-height: 14px"></div>
-    <canvas style="display: none"></canvas>
+    <div id="screen_container">
+      <div style="white-space: pre; font: 14px monospace; line-height: 14px"></div>
+      <canvas style="display: none"></canvas>
+    </div>
+
   </div>
-</div>
+
+
+  <script src="./node_modules/v86/build/libv86.js"></script>
+
+  <script>
+    "use strict";
+
+    async function checkSession() {
+
+      try {
+
+        const response =
+          await fetch(
+            `http://${location.hostname}:3001/session`,
+            {
+              credentials: "include"
+            }
+          );
+
+        if (!response.ok) {
+
+          window.location.replace(
+            "/login.html"
+          );
+
+          return false;
+        }
+
+        return true;
+
+      } catch {
+
+        window.location.replace(
+          "/login.html"
+        );
+
+        return false;
+      }
+    }
+
+
+    window.onload = async function () {
+
+      if (!(await checkSession())) {
+        return;
+      }
+
+
+      var emulator =
+        window.emulator = new V86({
+
+          wasm_path:
+            "./node_modules/v86/build/v86.wasm",
+
+          memory_size:
+            32 * 1024 * 1024,
+
+          vga_memory_size:
+            2 * 1024 * 1024,
+
+          screen_container:
+            document.getElementById(
+              "screen_container"
+            ),
+
+          bios: {
+            url:
+              "./images/seabios.bin",
+          },
+
+          vga_bios: {
+            url:
+              "./images/vgabios.bin",
+          },
+
+          cdrom: {
+            url:
+              "./images/linux.iso",
+          },
+
+          autostart: true,
+        });
+    }
+  </script>
+
+</body>
+
+</html>

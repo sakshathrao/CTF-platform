@@ -8,7 +8,7 @@ body {
 
 body {
 
-  background-image: url("assets/file_00000000bd7c81f4aafde805674aabef_upscayl_2x_upscayl-standard-4x.png");
+  background-image: url("/assets/file_00000000bd7c81f4aafde805674aabef_upscayl_2x_upscayl-standard-4x.png");
   background-repeat: no-repeat;
   background-size: cover;
   background-position: center;
@@ -223,6 +223,18 @@ details>a {
   margin-left: 25px;
 }
 
+.dialogBox>a {
+  display: inline-block;
+  background-color: white;
+  color: black;
+  border-radius: 10px;
+  padding: 10px;
+  margin-top: 10px;
+  /* margin-left: 25px; */
+  max-width: fit-content;
+  text-decoration: none;
+}
+
 .dialogBox {
   position: relative;
 
@@ -342,4 +354,10 @@ details>a {
 
 .dialogBox button:active {
   transform: translateY(0);
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }

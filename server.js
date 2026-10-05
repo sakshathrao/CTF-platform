@@ -1,37 +1,74 @@
 import http from "node:http";
 import crypto from "node:crypto";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { DatabaseSync } from "node:sqlite";
 import WebSocket, { WebSocketServer } from "ws";
 
 
 // ============================================================
-// Temporary storage
+// Database
 // ============================================================
 
-const teams = new Map();
-// teamName -> team data
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-const sessions = new Map();
-// sessionID -> teamName
+const db = new DatabaseSync(
+    path.join(__dirname, "../CTF_data/ctf.sqlite")
+);
+
+db.exec("PRAGMA foreign_keys = ON");
 
 
 // ============================================================
 // CTF state
 // ============================================================
 
-let state = {
+const state = {
     layout: "wait"
 };
 
 
 // ============================================================
-// HTTP server
+// Helpers
 // ============================================================
 
-const server = http.createServer((req, res) => {
+function sendJSON(res, status, data) {
 
-    // --------------------------------------------------------
-    // CORS
-    // --------------------------------------------------------
+    res.writeHead(status, {
+        "Content-Type": "application/json"
+    });
+
+    res.end(JSON.stringify(data));
+}
+
+
+function getCookie(req, name) {
+
+    const cookieHeader = req.headers.cookie;
+
+    if (!cookieHeader) {
+        return null;
+    }
+
+    for (const part of cookieHeader.split(";")) {
+
+        const [key, ...value] =
+            part.trim().split("=");
+
+        if (key === name) {
+            return decodeURIComponent(
+                value.join("=")
+            );
+        }
+    }
+
+    return null;
+}
+
+
+function setCORS(req, res) {
+
     const origin = req.headers.origin;
 
     if (origin) {
@@ -39,13 +76,15 @@ const server = http.createServer((req, res) => {
         try {
 
             const originURL = new URL(origin);
-            const serverHost = req.headers.host.split(":")[0];
+            const serverHost =
+                req.headers.host.split(":")[0];
 
             if (
                 originURL.protocol === "http:" &&
-                originURL.hostname === serverHost &&
-                originURL.port === "5173"
+                originURL.hostname === serverHost 
+                // originURL.port === "5173"
             ) {
+
                 res.setHeader(
                     "Access-Control-Allow-Origin",
                     origin
@@ -63,9 +102,10 @@ const server = http.createServer((req, res) => {
             }
 
         } catch {
-            // Invalid Origin header.
+            // Ignore invalid Origin headers.
         }
     }
+
     res.setHeader(
         "Access-Control-Allow-Methods",
         "GET, POST, OPTIONS"
@@ -75,334 +115,812 @@ const server = http.createServer((req, res) => {
         "Access-Control-Allow-Headers",
         "Content-Type"
     );
+}
 
 
-    // Browser's preflight request
-    if (req.method === "OPTIONS") {
+function readRequestBody(req) {
 
-        res.writeHead(204);
-        res.end();
-
-        return;
-    }
-
-
-    // --------------------------------------------------------
-    // Team login
-    // --------------------------------------------------------
-
-    if (req.method === "POST" && req.url === "/login") {
+    return new Promise((resolve, reject) => {
 
         let body = "";
 
         req.on("data", chunk => {
+
             body += chunk;
+
+            if (body.length > 1024 * 1024) {
+                reject(
+                    new Error("Request body too large")
+                );
+
+                req.destroy();
+            }
         });
 
         req.on("end", () => {
+            resolve(body);
+        });
+
+        req.on("error", reject);
+    });
+}
+
+
+function hashPassword(password, salt) {
+
+    return crypto.scryptSync(
+        password,
+        salt,
+        64
+    );
+}
+
+
+function passwordMatches(
+    password,
+    saltHex,
+    hashHex
+) {
+
+    const salt = Buffer.from(
+        saltHex,
+        "hex"
+    );
+
+    const storedHash = Buffer.from(
+        hashHex,
+        "hex"
+    );
+
+    const submittedHash =
+        hashPassword(password, salt);
+
+    return (
+        submittedHash.length ===
+        storedHash.length &&
+        crypto.timingSafeEqual(
+            submittedHash,
+            storedHash
+        )
+    );
+}
+
+
+function createSession(teamName) {
+
+    const sessionID =
+        crypto.randomBytes(32).toString("hex");
+
+    db.prepare(`
+        INSERT INTO sessions (
+            token,
+            team_name
+        )
+        VALUES (?, ?)
+    `).run(
+        sessionID,
+        teamName
+    );
+
+    return sessionID;
+}
+
+
+// ============================================================
+// HTTP server
+// ============================================================
+
+const server = http.createServer(
+    async (req, res) => {
+
+        setCORS(req, res);
+
+
+        // ----------------------------------------------------
+        // CORS preflight
+        // ----------------------------------------------------
+
+        if (req.method === "OPTIONS") {
+
+            res.writeHead(204);
+            res.end();
+
+            return;
+        }
+
+
+        // ====================================================
+        // REGISTER
+        // ====================================================
+
+        if (
+            req.method === "POST" &&
+            req.url === "/register"
+        ) {
 
             let data;
 
             try {
+
+                const body =
+                    await readRequestBody(req);
+
                 data = JSON.parse(body);
+
             } catch {
 
-                res.writeHead(400, {
-                    "Content-Type": "application/json"
-                });
-
-                res.end(JSON.stringify({
-                    error: "Invalid JSON"
-                }));
-
-                return;
-            }
-
-
-            const teamName = data.teamName;
-            const members = data.members;
-
-
-            // ------------------------------------------------
-            // Basic validation
-            // ------------------------------------------------
-
-            if (!teamName || !Array.isArray(members)) {
-
-                res.writeHead(400, {
-                    "Content-Type": "application/json"
-                });
-
-                res.end(JSON.stringify({
-                    error: "Invalid team data"
-                }));
+                sendJSON(
+                    res,
+                    400,
+                    {
+                        error: "Invalid request."
+                    }
+                );
 
                 return;
             }
 
 
+            const teamName =
+                typeof data.teamName === "string"
+                    ? data.teamName.trim()
+                    : "";
+
+            const password =
+                typeof data.password === "string"
+                    ? data.password
+                    : "";
+
+            const members =
+                Array.isArray(data.members)
+                    ? data.members
+                    : [];
+
+
             // ------------------------------------------------
-            // Temporary duplicate check
+            // Validate
             // ------------------------------------------------
 
-            if (teams.has(teamName)) {
+            if (
+                !teamName ||
+                !password ||
+                members.length < 1 ||
+                members.length > 3
+            ) {
 
-                res.writeHead(409, {
-                    "Content-Type": "application/json"
-                });
+                sendJSON(
+                    res,
+                    400,
+                    {
+                        error: "Missing or invalid fields."
+                    }
+                );
 
-                res.end(JSON.stringify({
-                    error: "Team already exists"
-                }));
+                return;
+            }
+
+
+            if (password.length < 8) {
+
+                sendJSON(
+                    res,
+                    400,
+                    {
+                        error:
+                            "Password must be at least 8 characters."
+                    }
+                );
+
+                return;
+            }
+
+
+            const memberValues = [];
+
+
+            for (let i = 0; i < 3; i++) {
+
+                const member =
+                    members[i] ?? {};
+
+                const name =
+                    typeof member.name === "string"
+                        ? member.name.trim()
+                        : "";
+
+                const usn =
+                    typeof member.usn === "string"
+                        ? member.usn.trim()
+                        : "";
+
+
+                // One supplied but not the other.
+
+                if (
+                    (name && !usn) ||
+                    (!name && usn)
+                ) {
+
+                    sendJSON(
+                        res,
+                        400,
+                        {
+                            error:
+                                `Member ${i + 1} needs both name and USN.`
+                        }
+                    );
+
+                    return;
+                }
+
+                if(usn && usn.length !== 10)
+                {
+                    sendJSON(
+                        res,
+                        400,
+                        {
+                            error:
+                                `Invalid USN.`
+                        }
+                    );
+                    return;
+                }
+
+                memberValues.push(
+                    name || null,
+                    usn || null
+                );
+            }
+
+
+            // Member 1 is mandatory.
+
+            if (
+                !memberValues[0] ||
+                !memberValues[1]
+            ) {
+
+                sendJSON(
+                    res,
+                    400,
+                    {
+                        error:
+                            "Team member 1 is required."
+                    }
+                );
 
                 return;
             }
 
 
             // ------------------------------------------------
-            // Create team
+            // Hash password
             // ------------------------------------------------
 
-            teams.set(teamName, {
-                name: teamName,
-                members: members,
-                points: 0
-            });
+            const salt =
+                crypto.randomBytes(16);
 
-
-            // ------------------------------------------------
-            // Create session ID
-            // ------------------------------------------------
-
-            const sessionID = crypto
-                .randomBytes(32)
-                .toString("hex");
-
-            sessions.set(sessionID, teamName);
+            const passwordHash =
+                hashPassword(
+                    password,
+                    salt
+                );
 
 
             // ------------------------------------------------
-            // Send cookie
+            // Database transaction
             // ------------------------------------------------
 
-            res.writeHead(200, {
+            try {
 
-                "Content-Type":
-                    "application/json",
-
-                "Set-Cookie":
-                    `session=${sessionID}; HttpOnly; SameSite=Strict`
-            });
-
-            res.end(JSON.stringify({
-                success: true
-            }));
-
-            console.log(`Team logged in: ${teamName}`);
-        });
-
-        return;
-    }
+                db.exec("BEGIN");
 
 
-    // --------------------------------------------------------
-    // Temporary test endpoint
-    // --------------------------------------------------------
+                // Create team.
 
-    if (req.method === "GET" && req.url === "/session") {
+                db.prepare(`
+                    INSERT INTO teams (
+                        name,
+                        password_hash,
+                        password_salt,
+                        points,
+                        member1_name,
+                        member1_usn,
+                        member2_name,
+                        member2_usn,
+                        member3_name,
+                        member3_usn
+                    )
+                    VALUES (
+                        ?,
+                        ?,
+                        ?,
+                        0,
+                        ?,
+                        ?,
+                        ?,
+                        ?,
+                        ?,
+                        ?
+                    )
+                `).run(
+                    teamName,
+                    passwordHash.toString("hex"),
+                    salt.toString("hex"),
+                    ...memberValues
+                );
 
-        const cookieHeader = req.headers.cookie;
 
-        if (!cookieHeader) {
+                // Create login session.
 
-            res.writeHead(401, {
-                "Content-Type": "application/json"
-            });
+                const sessionID =
+                    createSession(teamName);
 
-            res.end(JSON.stringify({
-                error: "Not logged in"
-            }));
+
+                db.exec("COMMIT");
+
+
+                // Give browser its cookie.
+
+                res.writeHead(201, {
+
+                    "Content-Type":
+                        "application/json",
+
+                    "Set-Cookie":
+                        `session=${encodeURIComponent(sessionID)}; ` +
+                        `HttpOnly; ` +
+                        `SameSite=Strict; ` +
+                        `Path=/`
+                });
+
+
+                res.end(JSON.stringify({
+                    success: true
+                }));
+
+
+                console.log(
+                    `Registered team: ${teamName}`
+                );
+
+            } catch (error) {
+
+                try {
+                    db.exec("ROLLBACK");
+                } catch {
+                    // Ignore rollback errors.
+                }
+
+
+                if (
+                    error?.code?.startsWith(
+                        "SQLITE_CONSTRAINT"
+                    )
+                ) {
+
+                    sendJSON(
+                        res,
+                        409,
+                        {
+                            error:
+                                "Team name already exists."
+                        }
+                    );
+
+                    return;
+                }
+
+
+                console.error(error);
+
+                sendJSON(
+                    res,
+                    500,
+                    {
+                        error:
+                            "Could not register team."
+                    }
+                );
+            }
 
             return;
         }
 
-        const cookies = Object.fromEntries(
-            cookieHeader
-                .split(";")
-                .map(cookie => {
-                    const [name, ...value] = cookie.trim().split("=");
-                    return [name, value.join("=")];
-                })
-        );
 
-        const sessionID = cookies.session;
+        // ====================================================
+        // LOGIN
+        // ====================================================
 
-        const teamName = sessions.get(sessionID);
+        if (
+            req.method === "POST" &&
+            req.url === "/login"
+        ) {
 
-        if (!teamName) {
+            let data;
 
-            res.writeHead(401, {
-                "Content-Type": "application/json"
-            });
+            try {
 
-            res.end(JSON.stringify({
-                error: "Invalid session"
-            }));
+                const body =
+                    await readRequestBody(req);
+
+                data = JSON.parse(body);
+
+            } catch {
+
+                sendJSON(
+                    res,
+                    400,
+                    {
+                        error:
+                            "Invalid request."
+                    }
+                );
+
+                return;
+            }
+
+
+            const teamName =
+                typeof data.teamName === "string"
+                    ? data.teamName.trim()
+                    : "";
+
+            const password =
+                typeof data.password === "string"
+                    ? data.password
+                    : "";
+
+
+            if (!teamName || !password) {
+
+                sendJSON(
+                    res,
+                    400,
+                    {
+                        error:
+                            "Team name and password are required."
+                    }
+                );
+
+                return;
+            }
+
+
+            // Find team.
+
+            const team = db.prepare(`
+                SELECT
+                    name,
+                    password_hash,
+                    password_salt
+                FROM teams
+                WHERE name = ?
+            `).get(teamName);
+
+
+            if (!team) {
+
+                sendJSON(
+                    res,
+                    401,
+                    {
+                        error:
+                            "Invalid team name or password."
+                    }
+                );
+
+                return;
+            }
+
+
+            // Verify password.
+
+            let valid = false;
+
+            try {
+
+                valid = passwordMatches(
+                    password,
+                    team.password_salt,
+                    team.password_hash
+                );
+
+            } catch {
+
+                valid = false;
+            }
+
+
+            if (!valid) {
+
+                sendJSON(
+                    res,
+                    401,
+                    {
+                        error:
+                            "Invalid team name or password."
+                    }
+                );
+
+                return;
+            }
+
+
+            // Create new session.
+
+            try {
+
+                const sessionID =
+                    createSession(teamName);
+
+
+                res.writeHead(200, {
+
+                    "Content-Type":
+                        "application/json",
+
+                    "Set-Cookie":
+                        `session=${encodeURIComponent(sessionID)}; ` +
+                        `HttpOnly; ` +
+                        `SameSite=Strict; ` +
+                        `Path=/`
+                });
+
+
+                res.end(JSON.stringify({
+                    success: true
+                }));
+
+
+                console.log(
+                    `Logged in: ${teamName}`
+                );
+
+            } catch (error) {
+
+                console.error(error);
+
+                sendJSON(
+                    res,
+                    500,
+                    {
+                        error:
+                            "Could not log in."
+                    }
+                );
+            }
 
             return;
         }
 
-        res.writeHead(200, {
-            "Content-Type": "application/json"
-        });
 
-        res.end(JSON.stringify({
-            loggedIn: true,
-            teamName
-        }));
+        // ====================================================
+        // SESSION CHECK
+        // ====================================================
 
-        return;
-    }
+        if (
+            req.method === "GET" &&
+            req.url === "/session"
+        ) {
 
-    // --------------------------------------------------------
-    // Unknown HTTP request
-    // --------------------------------------------------------
-
-    res.writeHead(404);
-    res.end("Not found");
-});
+            const sessionID =
+                getCookie(
+                    req,
+                    "session"
+                );
 
 
-// ============================================================
-// WebSocket server
-// ============================================================
+            if (!sessionID) {
 
-const wss = new WebSocketServer({
-    server: server
-});
+                sendJSON(
+                    res,
+                    401,
+                    {
+                        error:
+                            "Not logged in."
+                    }
+                );
 
-
-wss.on("connection", (socket, request) => {
-
-    const remoteAddress =
-        request.socket.remoteAddress;
-
-    console.log(
-        `WebSocket connection from ${remoteAddress}`
-    );
+                return;
+            }
 
 
-    // --------------------------------------------------------
-    // Is this the local admin?
-    // --------------------------------------------------------
-
-    const isLocal =
-        remoteAddress === "127.0.0.1" ||
-        remoteAddress === "::1" ||
-        remoteAddress === "::ffff:127.0.0.1";
+            const session =
+                db.prepare(`
+                    SELECT team_name
+                    FROM sessions
+                    WHERE token = ?
+                `).get(sessionID);
 
 
-    // Give everyone the current state.
+            if (!session) {
 
-    socket.send(JSON.stringify(state));
+                sendJSON(
+                    res,
+                    401,
+                    {
+                        error:
+                            "Invalid session."
+                    }
+                );
+
+                return;
+            }
 
 
-    // --------------------------------------------------------
-    // Messages
-    // --------------------------------------------------------
-
-    socket.on("message", message => {
-
-        // ONLY localhost can modify state.
-
-        if (!isLocal) {
-
-            console.log(
-                `Rejected state change from ${remoteAddress}`
+            sendJSON(
+                res,
+                200,
+                {
+                    loggedIn: true,
+                    teamName:
+                        session.team_name
+                }
             );
 
             return;
         }
 
 
-        let newState;
+        // ====================================================
+        // Unknown HTTP request
+        // ====================================================
 
-        try {
-            newState = JSON.parse(message);
-        } catch {
-
-            console.log("Invalid JSON");
-
-            return;
-        }
+        res.writeHead(404);
+        res.end("Not found");
+    }
+);
 
 
-        // Only allow valid layouts.
+// ============================================================
+// WebSocket
+// ============================================================
 
-        if (
-            !newState ||
-            typeof newState.layout !== "string"
-        ) {
-            console.log("Invalid state");
-
-            return;
-        }
+const wss = new WebSocketServer({
+    server
+});
 
 
-        if (
-            newState.layout !== "wait" &&
-            newState.layout !== "start" &&
-            newState.layout !== "end"
-        ) {
-            console.log("Invalid layout");
+wss.on(
+    "connection",
+    (socket, request) => {
 
-            return;
-        }
+        const remoteAddress =
+            request.socket.remoteAddress;
 
-
-        // Change state.
-
-        state = newState;
 
         console.log(
-            "State changed:",
-            state
+            `WebSocket connection from ${remoteAddress}`
         );
 
 
-        // Broadcast to everyone.
+        const isLocal =
+            remoteAddress === "127.0.0.1" ||
+            remoteAddress === "::1" ||
+            remoteAddress === "::ffff:127.0.0.1";
 
-        for (const client of wss.clients) {
 
-            if (client.readyState === WebSocket.OPEN) {
-                client.send(
-                    JSON.stringify(state)
+        // Everyone receives state.
+
+        socket.send(
+            JSON.stringify(state)
+        );
+
+
+        socket.on(
+            "message",
+            message => {
+
+                // Only local admin can modify state.
+
+                if (!isLocal) {
+
+                    console.log(
+                        `Rejected state change from ${remoteAddress}`
+                    );
+
+                    return;
+                }
+
+
+                let newState;
+
+                try {
+
+                    newState =
+                        JSON.parse(message);
+
+                } catch {
+
+                    console.log(
+                        "Invalid JSON"
+                    );
+
+                    return;
+                }
+
+
+                if (
+                    !newState ||
+                    typeof newState.layout !==
+                        "string"
+                ) {
+
+                    console.log(
+                        "Invalid state"
+                    );
+
+                    return;
+                }
+
+
+                if (
+                    newState.layout !== "wait" &&
+                    newState.layout !== "start" &&
+                    newState.layout !== "end"
+                ) {
+
+                    console.log(
+                        "Invalid layout"
+                    );
+
+                    return;
+                }
+
+
+                state.layout =
+                    newState.layout;
+
+
+                console.log(
+                    "State changed:",
+                    state
                 );
+
+
+                // Broadcast.
+
+                for (
+                    const client
+                    of wss.clients
+                ) {
+
+                    if (
+                        client.readyState ===
+                        WebSocket.OPEN
+                    ) {
+
+                        client.send(
+                            JSON.stringify(state)
+                        );
+                    }
+                }
             }
-        }
-    });
+        );
+    }
+);
 
 
-    socket.on("close", () => {
+// ============================================================
+// Start server
+// ============================================================
+
+server.listen(
+    3001,
+    "0.0.0.0",
+    () => {
 
         console.log(
-            `WebSocket disconnected: ${remoteAddress}`
+            "HTTP + WebSocket server running on port 3001"
         );
-    });
-});
 
-
-// ============================================================
-// Start everything
-// ============================================================
-
-server.listen(3001, "0.0.0.0", () => {
-
-    console.log(
-        "HTTP server: http://localhost:3001"
-    );
-
-    console.log(
-        "WebSocket server: ws://localhost:3001"
-    );
-});
+        console.log(
+            "Database:",
+            path.join(
+                __dirname,
+                "../CTF_data/ctf.sqlite"
+            )
+        );
+    }
+);

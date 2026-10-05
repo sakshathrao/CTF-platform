@@ -1,4 +1,4 @@
-const socket = new WebSocket(`ws://${location.hostname}:8080`);
+const socket = new WebSocket(`ws://${location.hostname}:3001`);
 
 socket.addEventListener("open", () => {
     console.log("Connected to server");
@@ -13,6 +13,36 @@ socket.addEventListener("message", event => {
 socket.addEventListener("close", () => {
     console.log("Disconnected from server");
 });
+
+async function checkSession() {
+
+    try {
+
+        const response = await fetch(
+            `http://${location.hostname}:3001/session`,
+            {
+                credentials: "include"
+            }
+        );
+
+        if (!response.ok) {
+            window.location.assign("/login.html");
+            return;
+        }
+
+        const data = await response.json();
+
+        console.log("Logged in as:", data.teamName);
+
+    } catch (error) {
+
+        console.error(error);
+        window.location.assign("/login.html");
+
+    }
+}
+
+checkSession();
 
 function render(state) {
     if(state.layout === "wait") {
@@ -49,32 +79,32 @@ function render(state) {
             {
                 title: "Challenge 1",
                 description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris.Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident.",
-                link: "1.html"
+                link: "challenge1.html"
             },
             {
                 title: "Challenge 2",
                 description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident.",
-                link: "1.html"
+                link: "challenge1.html"
             },
             {
                 title: "Challenge 3",
                 description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident.",
-                link: "1.html"
+                link: "challenge1.html"
             },
             {
                 title: "Challenge 4",
                 description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident.",
-                link: "1.html"
+                link: "challenge1.html"
             },
             {
                 title: "Challenge 5",
                 description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident.",
-                link: "1.html"
+                link: "challenge1.html"
             },
             {
                 title: "Challenge 6",
                 description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident.",
-                link: "1.html"
+                link: "challenge1.html"
             }            
         ];
 

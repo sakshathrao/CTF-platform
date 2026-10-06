@@ -361,3 +361,12 @@ form {
   flex-direction: column;
   gap: 20px;
 }
+
+.dialogBox button:disabled {
+  background-color: black;
+  color: grey;
+}
+
+.dialogBox button:disabled:hover {
+  transform: translateY(0px);
+}

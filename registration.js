@@ -1,5 +1,5 @@
 const registerButton =
-    document.getElementById(".dialogBox form");
+    document.getElementById("register");
 
 
 registerButton.addEventListener(

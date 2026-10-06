@@ -12,6 +12,7 @@
         packages = [
           pkgs.nodejs
           pkgs.sqlite
+          pkgs.gh
         ];
       };
     };

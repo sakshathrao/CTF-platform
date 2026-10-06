@@ -1,9 +1,9 @@
 const loginButton =
-    document.getElementById(".dialogBox form");
+    document.getElementById("login");
 
 
 loginButton.addEventListener(
-    "submit",
+    "click",
     async () => {
 
         const inputs =

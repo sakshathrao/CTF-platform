@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>Challenge 1</title>
+  <link rel="stylesheet" crossorigin href="/assets/main-B0SCFUcI.css">
+</head>
+
+<body>
+
+  <div class="main_bg" id="app"></div>
+
+
+  <script src="./node_modules/v86/build/libv86.js"></script>
+
+
+  <script>
+
+    "use strict";
+
+
+    const challengeID = 1;
+
+    const app =
+      document.getElementById(
+        "app"
+      );
+
+
+    let eventStarted = false;
+
+    let emulator = null;
+
+
+    // ========================================================
+    // SESSION
+    // ========================================================
+
+    async function checkSession() {
+
+      try {
+
+        const response =
+          await fetch(
+            `http://${location.hostname}:3001/session`,
+            {
+              credentials:
+                "include"
+            }
+          );
+
+
+        if (!response.ok) {
+
+          window.location.replace(
+            "/login.html"
+          );
+
+          return false;
+        }
+
+
+        return true;
+
+      } catch {
+
+        alert(
+          "Could not connect to the CTF server."
+        );
+
+
+        window.location.replace(
+          "/login.html"
+        );
+
+        return false;
+      }
+    }
+
+
+    // ========================================================
+    // PROGRESS COOKIE
+    // ========================================================
+
+    function getProgressCookie() {
+
+      for (
+        const cookie
+        of document.cookie.split(";")
+      ) {
+
+        const [
+          key,
+          ...value
+        ] =
+          cookie.trim().split("=");
+
+
+        if (
+          key ===
+          "ctf_progress"
+        ) {
+
+          try {
+
+            return JSON.parse(
+              decodeURIComponent(
+                value.join("=")
+              )
+            );
+
+          } catch {
+
+            return null;
+          }
+        }
+      }
+
+
+      return null;
+    }
+
+
+    function checkAlreadySolved() {
+
+      const progress =
+        getProgressCookie();
+
+
+      return (
+        progress &&
+        Array.isArray(
+          progress.solved
+        ) &&
+        progress.solved.includes(
+          challengeID
+        )
+      );
+    }
+
+
+    // ========================================================
+    // PROGRESS FROM DATABASE
+    // ========================================================
+
+    async function refreshProgress() {
+
+      try {
+
+        const response =
+          await fetch(
+            `http://${location.hostname}:3001/progress`,
+            {
+              credentials:
+                "include"
+            }
+          );
+
+
+        if (!response.ok) {
+          return;
+        }
+
+
+        const progress =
+          await response.json();
+
+
+        if (
+          Array.isArray(
+            progress.solved
+          ) &&
+          progress.solved.includes(
+            challengeID
+          )
+        ) {
+
+          return true;
+        }
+
+
+        return false;
+
+      } catch {
+
+        console.log(
+          "Could not refresh progress."
+        );
+
+        return false;
+      }
+    }
+
+
+    // ========================================================
+    // WAIT / END SCREEN
+    // ========================================================
+
+    function showClosedMessage() {
+
+      app.classList.remove(
+        "start"
+      );
+
+
+      app.replaceChildren();
+
+
+      const title =
+        document.createElement(
+          "h1small"
+        );
+
+
+      title.innerHTML =
+        "This form isn't accepting <br> responses right now.";
+
+
+      app.append(
+        title
+      );
+    }
+
+
+    // ========================================================
+    // CHALLENGE UI
+    // ========================================================
+
+    function showChallenge() {
+
+      app.classList.add(
+        "start"
+      );
+
+
+      app.replaceChildren();
+
+
+      const title =
+        document.createElement(
+          "h1"
+        );
+
+
+      title.textContent =
+        "Challenge 1";
+
+      title.style.paddingLeft = "6%";
+
+      const row =
+        document.createElement(
+          "div"
+        );
+
+
+      row.style.display =
+        "flex";
+
+      row.style.flexDirection =
+        "row";
+
+      row.style.justifyContent =
+        "space-around";
+
+      row.style.gap =
+        "30%";
+
+      row.style.paddingLeft = "6%";
+
+      // ------------------------------------------------------
+      // v86
+      // ------------------------------------------------------
+
+      const screenContainer =
+        document.createElement(
+          "div"
+        );
+
+
+      screenContainer.id =
+        "screen_container";
+
+
+      const screen =
+        document.createElement(
+          "div"
+        );
+
+
+      screen.style.whiteSpace =
+        "pre";
+
+      screen.style.font =
+        "14px monospace";
+
+      screen.style.lineHeight =
+        "14px";
+
+
+      const canvas =
+        document.createElement(
+          "canvas"
+        );
+
+
+      canvas.style.display =
+        "none";
+
+
+      screenContainer.append(
+        screen,
+        canvas
+      );
+
+
+      row.append(
+        screenContainer
+      );
+
+
+      // ------------------------------------------------------
+      // Flag box
+      // ------------------------------------------------------
+
+      const dialog =
+        document.createElement(
+          "div"
+        );
+
+
+      dialog.classList.add(
+        "dialogBox"
+      );
+
+
+      dialog.style.display =
+        "flex";
+
+      dialog.style.alignItems =
+        "center";
+
+
+      const label =
+        document.createElement(
+          "div"
+        );
+
+
+      label.textContent =
+        "The key:";
+
+
+      const flagInput =
+        document.createElement(
+          "input"
+        );
+
+
+      flagInput.id =
+        "flag";
+
+
+      flagInput.placeholder =
+        "xxxxx-xxxxx";
+
+
+      const submitButton =
+        document.createElement(
+          "button"
+        );
+
+
+      submitButton.id =
+        "submit";
+
+
+      submitButton.textContent =
+        "Submit";
+
+
+      const result =
+        document.createElement(
+          "div"
+        );
+
+
+      result.id =
+        "result";
+
+
+      dialog.append(
+        label,
+        flagInput,
+        submitButton,
+        result
+      );
+
+
+      row.append(
+        dialog
+      );
+
+
+      app.append(
+        title,
+        row
+      );
+
+
+      // ------------------------------------------------------
+      // Already solved?
+      // ------------------------------------------------------
+
+      if (
+        checkAlreadySolved()
+      ) {
+
+        flagInput.disabled =
+          true;
+
+        submitButton.disabled =
+          true;
+
+        result.textContent =
+          "Challenge already solved.";
+
+      }
+
+
+      // ------------------------------------------------------
+      // Submit
+      // ------------------------------------------------------
+
+      submitButton.addEventListener(
+        "click",
+        async () => {
+
+          if (
+            !eventStarted
+          ) {
+
+            alert(
+              "This form isn't accepting responses right now."
+            );
+
+            return;
+          }
+
+
+          const flag =
+            flagInput.value.trim();
+
+
+          if (!flag) {
+
+            alert(
+              "Please enter a flag."
+            );
+
+            return;
+          }
+
+
+          submitButton.disabled =
+            true;
+
+
+          result.textContent =
+            "Checking...";
+
+
+          try {
+
+            const response =
+              await fetch(
+                `http://${location.hostname}:3001/solve`,
+                {
+                  method:
+                    "POST",
+
+                  credentials:
+                    "include",
+
+                  headers: {
+                    "Content-Type":
+                      "application/json"
+                  },
+
+                  body:
+                    JSON.stringify({
+                      challengeId:
+                        challengeID,
+
+                      flag
+                    })
+                }
+              );
+
+
+            const data =
+              await response.json();
+
+
+            // ------------------------------------------------
+            // Correct
+            // ------------------------------------------------
+
+            if (
+              response.ok &&
+              data.success
+            ) {
+
+              flagInput.disabled =
+                true;
+
+              submitButton.disabled =
+                true;
+
+
+              if (
+                data.bonusPercent ===
+                30
+              ) {
+
+                alert(
+                  `CORRECT!\n\n` +
+                  `1st solve — +30% bonus!\n` +
+                  `Points awarded: ${data.pointsAwarded}\n` +
+                  `Total points: ${data.totalPoints}`
+                );
+
+              } else if (
+                data.bonusPercent ===
+                20
+              ) {
+
+                alert(
+                  `CORRECT!\n\n` +
+                  `2nd solve — +20% bonus!\n` +
+                  `Points awarded: ${data.pointsAwarded}\n` +
+                  `Total points: ${data.totalPoints}`
+                );
+
+              } else if (
+                data.bonusPercent ===
+                10
+              ) {
+
+                alert(
+                  `CORRECT!\n\n` +
+                  `3rd solve — +10% bonus!\n` +
+                  `Points awarded: ${data.pointsAwarded}\n` +
+                  `Total points: ${data.totalPoints}`
+                );
+
+              } else {
+
+                alert(
+                  `CORRECT!\n\n` +
+                  `Regular points awarded: ${data.pointsAwarded}\n` +
+                  `Total points: ${data.totalPoints}`
+                );
+              }
+
+
+              result.textContent =
+                `Solved! +${data.pointsAwarded} points.`;
+
+              return;
+            }
+
+
+            // ------------------------------------------------
+            // Already solved
+            // ------------------------------------------------
+
+            if (
+              response.status ===
+              409
+            ) {
+
+              flagInput.disabled =
+                true;
+
+              submitButton.disabled =
+                true;
+
+              result.textContent =
+                "Challenge already solved.";
+
+              alert(
+                "Your team has already solved this challenge."
+              );
+
+              return;
+            }
+
+
+            // ------------------------------------------------
+            // Event not accepting responses
+            // ------------------------------------------------
+
+            if (
+              response.status ===
+              403
+            ) {
+
+              flagInput.disabled =
+                true;
+
+              submitButton.disabled =
+                true;
+
+              alert(
+                "This form isn't accepting responses right now."
+              );
+
+              return;
+            }
+
+
+            // ------------------------------------------------
+            // Incorrect flag
+            // ------------------------------------------------
+
+            if (
+              response.status ===
+              400
+            ) {
+
+              alert(
+                "Incorrect flag."
+              );
+
+
+              result.textContent =
+                "Incorrect flag.";
+
+
+              submitButton.disabled =
+                false;
+
+
+              return;
+            }
+
+
+            // ------------------------------------------------
+            // Server failure
+            // ------------------------------------------------
+
+            alert(
+              data.error ||
+              "Something went wrong on the server."
+            );
+
+
+            result.textContent =
+              "Server error.";
+
+
+            submitButton.disabled =
+              false;
+
+
+          } catch (error) {
+
+            console.error(
+              error
+            );
+
+
+            alert(
+              "SHIT FAILED.\n\n" +
+              "Could not contact the CTF server."
+            );
+
+
+            result.textContent =
+              "Connection failed.";
+
+
+            submitButton.disabled =
+              false;
+          }
+        }
+      );
+
+
+      // ------------------------------------------------------
+      // Start v86 only when event is live
+      // ------------------------------------------------------
+
+      emulator =
+        window.emulator =
+        new V86({
+
+          wasm_path:
+            "./node_modules/v86/build/v86.wasm",
+
+          memory_size:
+            32 * 1024 * 1024,
+
+          vga_memory_size:
+            2 * 1024 * 1024,
+
+          screen_container:
+            screenContainer,
+
+          bios: {
+            url:
+              "./images/seabios.bin",
+          },
+
+          vga_bios: {
+            url:
+              "./images/vgabios.bin",
+          },
+
+          cdrom: {
+            url:
+              "./images/linux.iso",
+          },
+
+          autostart:
+            true,
+        });
+    }
+
+
+    // ========================================================
+    // EVENT STATE
+    // ========================================================
+
+    function render(
+      state
+    ) {
+
+      if (
+        state.layout ===
+        "start"
+      ) {
+
+        eventStarted =
+          true;
+
+
+        /*
+         * Don't recreate the whole challenge
+         * every time we receive a state message.
+         */
+
+        if (
+          !document.getElementById(
+            "submit"
+          )
+        ) {
+
+          showChallenge();
+        }
+
+
+        return;
+      }
+
+
+      // wait / end
+
+      eventStarted =
+        false;
+
+
+      /*
+       * Stop the VM if the event goes offline.
+       */
+
+      if (
+        emulator &&
+        typeof emulator.stop ===
+        "function"
+      ) {
+
+        emulator.stop();
+
+        emulator =
+          null;
+      }
+
+
+      showClosedMessage();
+    }
+
+
+    // ========================================================
+    // WEBSOCKET
+    // ========================================================
+
+    function connectEventSocket() {
+
+      const socket =
+        new WebSocket(
+          `ws://${location.hostname}:3001`
+        );
+
+
+      socket.addEventListener(
+        "open",
+        () => {
+
+          console.log(
+            "Connected to server"
+          );
+        }
+      );
+
+
+      socket.addEventListener(
+        "message",
+        event => {
+
+          try {
+
+            const state =
+              JSON.parse(
+                event.data
+              );
+
+
+            render(
+              state
+            );
+
+          } catch (error) {
+
+            console.error(
+              "Invalid event state:",
+              error
+            );
+          }
+        }
+      );
+
+
+      socket.addEventListener(
+        "close",
+        () => {
+
+          eventStarted =
+            false;
+
+
+          if (
+            emulator &&
+            typeof emulator.stop ===
+            "function"
+          ) {
+
+            emulator.stop();
+
+            emulator =
+              null;
+          }
+
+
+          showClosedMessage();
+
+
+          /*
+           * Try reconnecting.
+           */
+
+          setTimeout(
+            connectEventSocket,
+            2000
+          );
+        }
+      );
+
+
+      socket.addEventListener(
+        "error",
+        error => {
+
+          console.error(
+            "WebSocket error:",
+            error
+          );
+        }
+      );
+    }
+
+
+    // ========================================================
+    // START
+    // ========================================================
+
+    window.onload =
+      async function () {
+
+        if (
+          !(await checkSession())
+        ) {
+
+          return;
+        }
+
+
+        await refreshProgress();
+
+
+        /*
+         * WebSocket immediately sends the current
+         * state, exactly like main.js.
+         */
+
+        connectEventSocket();
+      };
+
+  </script>
+
+</body>
+
+</html>

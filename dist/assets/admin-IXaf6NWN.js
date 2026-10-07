@@ -1,0 +1,1 @@
+import"./modulepreload-polyfill-P2Xu9kJm.js";var e=new WebSocket(`ws://127.0.0.1:3001`),t=document.querySelector(`#layout`);document.querySelector(`#update`).addEventListener(`click`,()=>{if(e.readyState!==WebSocket.OPEN){alert(`Not connected to server.`);return}let n={layout:t.value};e.send(JSON.stringify(n))});

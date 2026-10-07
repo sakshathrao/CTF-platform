@@ -11,7 +11,7 @@
   <div class="main_bg" id="app"></div>
 
 
-  <script src="./node_modules/v86/build/libv86.js"></script>
+  <script src="/node_modules/v86/build/libv86.js"></script>
 
 
   <script>
@@ -694,37 +694,33 @@
       emulator =
         window.emulator =
         new V86({
+          wasm_path: "./node_modules/v86/build/v86.wasm",
+          memory_size: 64 * 1024 * 1024,
+          vga_memory_size: 2 * 1024 * 1024,
 
-          wasm_path:
-            "./node_modules/v86/build/v86.wasm",
-
-          memory_size:
-            32 * 1024 * 1024,
-
-          vga_memory_size:
-            2 * 1024 * 1024,
-
-          screen_container:
-            screenContainer,
+          screen_container: document.getElementById("screen_container"),
 
           bios: {
-            url:
-              "./images/seabios.bin",
+            url: "images/seabios.bin",
           },
 
           vga_bios: {
-            url:
-              "./images/vgabios.bin",
+            url: "images/vgabios.bin",
           },
 
-          cdrom: {
-            url:
-              "./images/linux.iso",
+          bzimage: {
+            url: "/images/customBzImage",
           },
 
-          autostart:
-            true,
+          net_device: {
+            type: "virtio",
+            relay_url: "fetch",
+          },
+
+          autostart: true,
         });
+
+      emulator.serial0_send("wget http://example.com/\n");
     }
 
 

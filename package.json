@@ -1,12 +1,14 @@
 {
   "devDependencies": {
-    "vite": "^8.3.1"
+    "vite": "^8.3.4"
   },
   "dependencies": {
     "v86": "^0.5.469",
     "ws": "^8.22.0"
   },
   "scripts": {
-    "build": "vite build"
-  }
+    "build": "vite build && node scripts/compress-assets.js",
+    "compress": "node scripts/compress-assets.js"
+  },
+  "type": "module"
 }

@@ -23,10 +23,7 @@ const __dirname =
 
 const db =
     new DatabaseSync(
-        path.join(
-            __dirname,
-            "../CTF_data/ctf.sqlite"
-        )
+        path.join(__dirname, "CTF_data/ctf.sqlite")
     );
 
 db.exec(
@@ -41,6 +38,70 @@ db.exec(
 const state = {
     layout: "wait"
 };
+
+// Rate limiting: track requests per team/session
+const rateLimitMap = new Map();
+const RATE_LIMIT_WINDOW = 60000; // 1 minute
+const RATE_LIMIT_MAX = 30; // max requests per window
+const FLAG_RATE_LIMIT_MAX = 10; // max flag submissions per window
+
+function checkRateLimit(key, max) {
+    const now = Date.now();
+    const record = rateLimitMap.get(key) || { count: 0, resetAt: now + RATE_LIMIT_WINDOW };
+    
+    if (now > record.resetAt) {
+        record.count = 0;
+        record.resetAt = now + RATE_LIMIT_WINDOW;
+    }
+    
+    record.count++;
+    rateLimitMap.set(key, record);
+    
+    // Cleanup old entries periodically
+    if (rateLimitMap.size > 1000) {
+        for (const [k, v] of rateLimitMap) {
+            if (v.resetAt < now) rateLimitMap.delete(k);
+        }
+    }
+    
+    return record.count <= max;
+}
+
+// Simple HTML escaper for XSS prevention
+function escapeHTML(str) {
+    if (typeof str !== 'string') return str;
+    return str.replace(/&/g, '&amp;')
+              .replace(/</g, '&lt;')
+              .replace(/>/g, '&gt;')
+              .replace(/"/g, '&quot;')
+              .replace(/'/g, '&#x27;');
+}
+
+// Validate team name: alphanumeric, hyphens, underscores, 1-32 chars
+function validateTeamName(name) {
+    if (typeof name !== 'string') return false;
+    return /^[a-zA-Z0-9_-]{1,32}$/.test(name);
+}
+
+// Validate USN: exactly 10 digits
+function validateUSN(usn) {
+    if (typeof usn !== 'string') return false;
+    return /^\d{10}$/.test(usn);
+}
+
+// CSRF token generation and validation
+function generateCSRFToken() {
+    return crypto.randomBytes(32).toString('hex');
+}
+
+const csrfTokenStore = new Map(); // teamName -> csrfToken
+
+function validateCSRFToken(teamName, token) {
+    const stored = csrfTokenStore.get(teamName);
+    if (!stored || stored !== token) return false;
+    csrfTokenStore.delete(teamName); // Single use
+    return true;
+}
 
 
 // ============================================================
@@ -115,10 +176,36 @@ function makeCookie(
 }
 
 
+function setSecurityHeaders(
+    res
+) {
+    // Prevent clickjacking
+    res.setHeader("X-Frame-Options", "DENY");
+    // XSS protection for older browsers
+    res.setHeader("X-XSS-Protection", "0");
+    // Prevent MIME-type sniffing
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    // Referrer policy
+    res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+    // Content Security Policy - restrict script sources to self
+    // Note: v86 loads scripts from node_modules, so we allow that
+    res.setHeader("Content-Security-Policy", 
+        "default-src 'self'; " +
+        "script-src 'self' 'unsafe-inline' blob: data:; " +
+        "style-src 'self' 'unsafe-inline'; " +
+        "img-src 'self' data: blob:; " +
+        "connect-src 'self' ws: wss:; " +
+        "font-src 'self' data:; " +
+        "object-src 'none'; " +
+        "frame-ancestors 'none'");
+}
+
 function setCORS(
     req,
     res
 ) {
+
+    setSecurityHeaders(res);
 
     const origin =
         req.headers.origin;
@@ -428,11 +515,29 @@ const server =
                 }
 
 
-                const teamName =
+                const teamNameRaw =
                     typeof data.teamName ===
                     "string"
                         ? data.teamName.trim()
                         : "";
+                
+                // Validate team name format (alphanumeric, hyphens, underscores only)
+                if (!validateTeamName(teamNameRaw)) {
+
+                    sendJSON(
+                        res,
+                        400,
+                        {
+                            error:
+                                "Invalid team name. Use only letters, numbers, hyphens, and underscores (1-32 characters)."
+                        }
+                    );
+
+                    return;
+
+                }
+
+                const teamName = teamNameRaw;
 
                 const password =
                     typeof data.password ===
@@ -998,7 +1103,7 @@ const server =
             // FLAG SUBMISSION
             // =================================================
 
-            if (
+                        if (
                 req.method === "POST" &&
                 req.url === "/solve"
             ) {
@@ -1022,6 +1127,15 @@ const server =
                     return;
                 }
 
+                // Rate limiting per team for flag submissions
+                if (!checkRateLimit('solve:' + teamName, FLAG_RATE_LIMIT_MAX)) {
+                    sendJSON(
+                        res,
+                        429,
+                        { error: 'Too many flag submissions. Please wait before trying again.' }
+                    );
+                    return;
+                }
 
                 // Don't allow submissions while
                 // the event isn't running.
@@ -1042,7 +1156,6 @@ const server =
 
                     return;
                 }
-
 
                 let data;
 
@@ -1622,10 +1735,7 @@ server.listen(
 
         console.log(
             "Database:",
-            path.join(
-                __dirname,
-                "../CTF_data/ctf.sqlite"
-            )
+            path.join(__dirname, "CTF_data/ctf.sqlite")
         );
     }
 );

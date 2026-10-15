@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "vite",
     "start": "node server.js",
+    "lan": "node server.js --host",
     "build": "vite build && node scripts/compress-assets.js",
     "compress": "node scripts/compress-assets.js",
     "test": "node --test tests/platform.test.js"

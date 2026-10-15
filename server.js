@@ -1,5 +1,6 @@
 import http from "node:http";
 import net from "node:net";
+import os from "node:os";
 import crypto from "node:crypto";
 import path from "node:path";
 import { existsSync, mkdirSync, readFileSync, statSync, createReadStream } from "node:fs";
@@ -2060,8 +2061,12 @@ wss.on(
 // In-Browser VM SSH TCP Proxy (127.0.0.1 loopback only)
 // ============================================================
 
+const isHostArg = process.argv.includes("--host") || process.env.HOST === "0.0.0.0";
+const HOST = process.env.HOST || (isHostArg ? "0.0.0.0" : "127.0.0.1");
+const PORT = Number(process.env.PORT) || 3001;
+
 const SSH_PORT = Number(process.env.SSH_PORT) || 2222;
-const SSH_HOST = "127.0.0.1";
+const SSH_HOST = process.env.SSH_HOST || (HOST === "0.0.0.0" ? "0.0.0.0" : "127.0.0.1");
 
 const sshServer = net.createServer((clientSocket) => {
     console.log(`SSH TCP client connected from ${clientSocket.remoteAddress}:${clientSocket.remotePort}`);
@@ -2143,26 +2148,33 @@ server.on("error", (err) => {
 // Start server (loopback only)
 // ============================================================
 
-const HOST = process.env.HOST || "127.0.0.1";
-const PORT = Number(process.env.PORT) || 3001;
-
 server.listen(
     PORT,
     HOST,
     () => {
-        console.log(
-            `CTF Server running on http://${HOST}:${PORT}`
-        );
+        console.log(`\n  \x1b[32m➜\x1b[0m  \x1b[1mLocal:\x1b[0m   http://localhost:${PORT}/`);
 
-        console.log(
-            "Database:",
-            dbPath
-        );
+        const interfaces = os.networkInterfaces();
+        const networkIps = [];
+        for (const name of Object.keys(interfaces)) {
+            for (const iface of interfaces[name] || []) {
+                if (iface.family === "IPv4" && !iface.internal) {
+                    networkIps.push(iface.address);
+                }
+            }
+        }
 
-        console.log(
-            "Admin Token:",
-            ADMIN_TOKEN
-        );
+        if (HOST === "0.0.0.0") {
+            for (const ip of networkIps) {
+                console.log(`  \x1b[32m➜\x1b[0m  \x1b[1mNetwork:\x1b[0m http://${ip}:${PORT}/`);
+            }
+        } else {
+            console.log(`  \x1b[33m➜\x1b[0m  \x1b[2mNetwork: use --host to expose to LAN\x1b[0m`);
+        }
+
+        console.log(`\n  \x1b[36m➜\x1b[0m  \x1b[1mSSH Proxy:\x1b[0m ${SSH_HOST}:${SSH_PORT}`);
+        console.log(`  \x1b[35m➜\x1b[0m  \x1b[1mAdmin Token:\x1b[0m ${ADMIN_TOKEN}`);
+        console.log(`  \x1b[90mDatabase: ${dbPath}\x1b[0m\n`);
     }
 );
 

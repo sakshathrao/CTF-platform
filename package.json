@@ -7,8 +7,10 @@
     "ws": "^8.22.0"
   },
   "scripts": {
+    "start": "node server.js",
     "build": "vite build && node scripts/compress-assets.js",
-    "compress": "node scripts/compress-assets.js"
+    "compress": "node scripts/compress-assets.js",
+    "test": "node --test tests/platform.test.js"
   },
   "type": "module"
 }

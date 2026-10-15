@@ -1,6 +1,8 @@
 import http from "node:http";
+import net from "node:net";
 import crypto from "node:crypto";
 import path from "node:path";
+import { existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { DatabaseSync } from "node:sqlite";
 
@@ -12,7 +14,7 @@ import { challenges } from "./challenges.js";
 
 
 // ============================================================
-// Database
+// Database & Configuration
 // ============================================================
 
 const __filename =
@@ -21,14 +23,90 @@ const __filename =
 const __dirname =
     path.dirname(__filename);
 
-const db =
-    new DatabaseSync(
-        path.join(__dirname, "CTF_data/ctf.sqlite")
-    );
+// Robust database path resolution:
+// 1. Explicit DB_PATH env var
+// 2. ../CTF_data/ctf.sqlite (default location in parent dir)
+// 3. ./CTF_data/ctf.sqlite (fallback in current dir)
+const candidateDbPaths = [
+    process.env.DB_PATH,
+    path.join(__dirname, "../CTF_data/ctf.sqlite"),
+    path.join(__dirname, "CTF_data/ctf.sqlite")
+].filter(Boolean);
 
-db.exec(
-    "PRAGMA foreign_keys = ON"
+const dbPath = candidateDbPaths.find(p => existsSync(p)) || candidateDbPaths[1] || candidateDbPaths[0];
+const dbDir = path.dirname(dbPath);
+if (!existsSync(dbDir)) {
+    mkdirSync(dbDir, { recursive: true });
+}
+
+const db = new DatabaseSync(dbPath);
+
+db.exec("PRAGMA foreign_keys = ON;");
+db.exec("PRAGMA journal_mode = WAL;");
+
+// Initialize tables if they do not exist
+db.exec(`
+CREATE TABLE IF NOT EXISTS teams (
+    name TEXT PRIMARY KEY,
+    points INTEGER NOT NULL DEFAULT 0,
+    member1_name TEXT NOT NULL,
+    member1_usn TEXT NOT NULL,
+    member2_name TEXT,
+    member2_usn TEXT,
+    member3_name TEXT,
+    member3_usn TEXT,
+    password_hash TEXT,
+    password_salt TEXT
 );
+
+CREATE TABLE IF NOT EXISTS challenges (
+    id INTEGER PRIMARY KEY,
+    solve_count INTEGER NOT NULL DEFAULT 0,
+    flag TEXT
+);
+
+CREATE TABLE IF NOT EXISTS solves (
+    team_name TEXT NOT NULL,
+    challenge_id INTEGER NOT NULL,
+    PRIMARY KEY (team_name, challenge_id),
+    FOREIGN KEY (team_name) REFERENCES teams(name),
+    FOREIGN KEY (challenge_id) REFERENCES challenges(id)
+);
+
+CREATE TABLE IF NOT EXISTS sessions (
+    token TEXT PRIMARY KEY,
+    team_name TEXT NOT NULL,
+    FOREIGN KEY (team_name) REFERENCES teams(name)
+);
+`);
+
+// Seed any challenges from challenges.js missing from the database
+try {
+    const existingChallenges = new Set(
+        db.prepare("SELECT id FROM challenges").all().map(c => c.id)
+    );
+    const insertChallenge = db.prepare(
+        "INSERT INTO challenges (id, flag, solve_count) VALUES (?, ?, 0)"
+    );
+    for (const c of challenges) {
+        if (!existingChallenges.has(c.id)) {
+            insertChallenge.run(c.id, `flag{challenge_${c.id}_secret}`);
+        }
+    }
+} catch (err) {
+    console.warn("Could not sync challenges:", err.message);
+}
+
+// Admin Token: environment variable or random secure token
+const ADMIN_TOKEN = (process.env.ADMIN_TOKEN && process.env.ADMIN_TOKEN.trim()) || "ctf-admin-secret-" + crypto.randomBytes(16).toString("hex");
+
+function verifyAdminToken(providedToken) {
+    if (!providedToken || typeof providedToken !== "string") return false;
+    const provided = Buffer.from(providedToken);
+    const expected = Buffer.from(ADMIN_TOKEN);
+    if (provided.length !== expected.length) return false;
+    return crypto.timingSafeEqual(provided, expected);
+}
 
 
 // ============================================================
@@ -1569,6 +1647,153 @@ const server =
 
 
             // =================================================
+            // ADMIN STATE (HTTP endpoint)
+            // =================================================
+
+            if (
+                req.method === "POST" &&
+                req.url === "/admin/state"
+            ) {
+                const authHeader = req.headers.authorization || "";
+                const bearerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : null;
+                const headerToken = req.headers["x-admin-token"] || bearerToken;
+
+                let bodyData = {};
+                try {
+                    const body = await readRequestBody(req);
+                    bodyData = body ? JSON.parse(body) : {};
+                } catch {
+                    sendJSON(res, 400, { error: "Invalid JSON request body." });
+                    return;
+                }
+
+                const token = headerToken || bodyData.token || bodyData.adminToken;
+                if (!verifyAdminToken(token)) {
+                    sendJSON(res, 401, { error: "Unauthorized: Invalid or missing admin token." });
+                    return;
+                }
+
+                const newLayout = bodyData.layout;
+                if (newLayout !== "wait" && newLayout !== "start" && newLayout !== "end") {
+                    sendJSON(res, 400, { error: "Invalid layout. Must be 'wait', 'start', or 'end'." });
+                    return;
+                }
+
+                state.layout = newLayout;
+                console.log("State updated via HTTP admin to:", state);
+
+                const broadcastMsg = JSON.stringify(state);
+                for (const client of wss.clients) {
+                    if (client.readyState === WebSocket.OPEN) {
+                        client.send(broadcastMsg);
+                    }
+                }
+
+                sendJSON(res, 200, { success: true, state });
+                return;
+            }
+
+
+            // =================================================
+            // Static file serving (dist/)
+            // =================================================
+
+            if (req.method === "GET") {
+                const distDir = path.join(__dirname, "dist");
+                if (existsSync(distDir)) {
+                    let urlPath;
+                    try {
+                        urlPath = decodeURIComponent(req.url.split("?")[0]);
+                    } catch {
+                        res.writeHead(400);
+                        res.end("Bad Request");
+                        return;
+                    }
+
+                    if (urlPath.includes("..") || urlPath.startsWith("/..")) {
+                        res.writeHead(403);
+                        res.end("Forbidden");
+                        return;
+                    }
+
+                    let cleanPath = urlPath.startsWith("/") ? urlPath.slice(1) : urlPath;
+                    if (cleanPath === "" || cleanPath === "/") {
+                        cleanPath = "main.html";
+                    }
+
+                    const filePath = path.join(distDir, cleanPath);
+                    const resolvedPath = path.resolve(filePath);
+                    const resolvedDist = path.resolve(distDir);
+
+                    if ((resolvedPath.startsWith(resolvedDist + path.sep) || resolvedPath === resolvedDist) && existsSync(resolvedPath)) {
+                        try {
+                            const stats = statSync(resolvedPath);
+                            if (!stats.isDirectory()) {
+                                const ext = path.extname(resolvedPath).toLowerCase();
+                                const MIME_TYPES = {
+                                    ".html": "text/html; charset=utf-8",
+                                    ".css": "text/css; charset=utf-8",
+                                    ".js": "application/javascript; charset=utf-8",
+                                    ".mjs": "application/javascript; charset=utf-8",
+                                    ".json": "application/json",
+                                    ".png": "image/png",
+                                    ".jpg": "image/jpeg",
+                                    ".jpeg": "image/jpeg",
+                                    ".gif": "image/gif",
+                                    ".webp": "image/webp",
+                                    ".svg": "image/svg+xml",
+                                    ".ico": "image/x-icon",
+                                    ".wasm": "application/wasm",
+                                    ".bin": "application/octet-stream",
+                                    ".img": "application/octet-stream",
+                                    ".iso": "application/x-iso9660-image"
+                                };
+                                const contentType = MIME_TYPES[ext] || "application/octet-stream";
+
+                                // Content negotiation
+                                const acceptEncoding = (req.headers["accept-encoding"] || "")
+                                    .split(",")
+                                    .map(e => e.trim().split(";")[0].toLowerCase());
+
+                                let servePath = resolvedPath;
+                                let encoding = null;
+
+                                if (acceptEncoding.includes("br") && existsSync(resolvedPath + ".br")) {
+                                    servePath = resolvedPath + ".br";
+                                    encoding = "br";
+                                } else if (acceptEncoding.includes("gzip") && existsSync(resolvedPath + ".gz")) {
+                                    servePath = resolvedPath + ".gz";
+                                    encoding = "gzip";
+                                }
+
+                                res.setHeader("Vary", "Accept-Encoding");
+                                res.setHeader("Content-Type", contentType);
+
+                                if (encoding) {
+                                    res.setHeader("Content-Encoding", encoding);
+                                }
+
+                                if (cleanPath.startsWith("assets/") && /\-[A-Za-z0-9_-]{8,}\.(js|css|png|webp|svg)$/.test(cleanPath)) {
+                                    res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+                                } else if (cleanPath.endsWith(".html")) {
+                                    res.setHeader("Cache-Control", "no-cache");
+                                } else {
+                                    res.setHeader("Cache-Control", "public, max-age=3600");
+                                }
+
+                                res.writeHead(200);
+                                res.end(readFileSync(servePath));
+                                return;
+                            }
+                        } catch (err) {
+                            console.error("Static file error:", err);
+                        }
+                    }
+                }
+            }
+
+
+            // =================================================
             // Unknown request
             // =================================================
 
@@ -1587,155 +1812,290 @@ const server =
 
 const wss =
     new WebSocketServer({
-        server
+        noServer: true,
+        maxPayload: 4096 // Limit message payload to 4KB to prevent DoS
     });
 
+const vmTunnelWss =
+    new WebSocketServer({
+        noServer: true,
+        maxPayload: 65536
+    });
+
+// Periodic heartbeat to prevent dead socket leaks
+const heartbeatInterval = setInterval(() => {
+    for (const client of wss.clients) {
+        if (client.isAlive === false) {
+            client.terminate();
+            continue;
+        }
+        client.isAlive = false;
+        client.ping();
+    }
+}, 30000);
+
+wss.on("close", () => {
+    clearInterval(heartbeatInterval);
+});
+
+// Map of teamName -> active WebSocket tunnel
+const activeTunnels = new Map();
+
+vmTunnelWss.on("connection", (socket, request, teamName) => {
+    console.log(`VM tunnel WebSocket connected for team: ${teamName}`);
+    activeTunnels.set(teamName, socket);
+
+    socket.on("close", () => {
+        console.log(`VM tunnel WebSocket closed for team: ${teamName}`);
+        if (activeTunnels.get(teamName) === socket) {
+            activeTunnels.delete(teamName);
+        }
+    });
+
+    socket.on("error", (err) => {
+        console.error(`VM tunnel WebSocket error for team ${teamName}:`, err.message);
+    });
+});
+
+// Upgrade handling for HTTP server: route /vm-tunnel (authenticated) vs event state
+server.on("upgrade", (request, socket, head) => {
+    let pathname = "";
+    try {
+        pathname = new URL(request.url, `http://${request.headers.host || "localhost"}`).pathname;
+    } catch {
+        socket.destroy();
+        return;
+    }
+
+    if (pathname === "/vm-tunnel") {
+        const teamName = getTeamFromSession(request);
+        if (!teamName) {
+            socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
+            socket.destroy();
+            return;
+        }
+        vmTunnelWss.handleUpgrade(request, socket, head, (ws) => {
+            vmTunnelWss.emit("connection", ws, request, teamName);
+        });
+    } else {
+        wss.handleUpgrade(request, socket, head, (ws) => {
+            wss.emit("connection", ws, request);
+        });
+    }
+});
 
 wss.on(
     "connection",
     (socket, request) => {
+        socket.isAlive = true;
+        socket.on("pong", () => { socket.isAlive = true; });
 
         const remoteAddress =
             request.socket.remoteAddress;
-
 
         console.log(
             `WebSocket connection from ${remoteAddress}`
         );
 
+        // Origin check when header is present
+        const origin = request.headers.origin;
+        if (origin) {
+            try {
+                const originURL = new URL(origin);
+                const hostHeader = request.headers.host || "";
+                const hostName = hostHeader.split(":")[0];
+                const allowed = (
+                    originURL.hostname === hostName ||
+                    originURL.hostname === "localhost" ||
+                    originURL.hostname === "127.0.0.1"
+                );
+                if (!allowed) {
+                    console.warn(`WebSocket blocked for untrusted origin: ${origin}`);
+                    socket.close(1008, "Origin not allowed");
+                    return;
+                }
+            } catch {
+                socket.close(1008, "Invalid origin");
+                return;
+            }
+        }
 
-        const isLocal =
-            remoteAddress ===
-                "127.0.0.1" ||
-            remoteAddress ===
-                "::1" ||
-            remoteAddress ===
-                "::ffff:127.0.0.1";
+        // Rate limiting: max 30 messages per 10-second window per socket
+        let msgCount = 0;
+        let windowReset = Date.now() + 10000;
 
-
-        // Everyone receives event state.
-
+        // Everyone receives current event state on connect
         socket.send(
             JSON.stringify(
                 state
             )
         );
 
-
         socket.on(
             "message",
             message => {
-
-                // Only local admin can modify state.
-
-                if (!isLocal) {
-
-                    console.log(
-                        `Rejected state change from ${remoteAddress}`
-                    );
-
+                const now = Date.now();
+                if (now > windowReset) {
+                    msgCount = 0;
+                    windowReset = now + 10000;
+                }
+                msgCount++;
+                if (msgCount > 30) {
+                    socket.send(JSON.stringify({ error: "Rate limit exceeded" }));
                     return;
                 }
 
-
-                let newState;
-
+                let payload;
                 try {
-
-                    newState =
-                        JSON.parse(
-                            message
-                        );
-
+                    payload = JSON.parse(message.toString());
                 } catch {
-
-                    console.log(
-                        "Invalid JSON"
-                    );
-
+                    socket.send(JSON.stringify({ error: "Invalid JSON format" }));
                     return;
                 }
 
-
-                if (
-                    !newState ||
-                    typeof newState.layout !==
-                        "string"
-                ) {
-
-                    console.log(
-                        "Invalid state"
-                    );
-
+                if (!payload || typeof payload !== "object") {
+                    socket.send(JSON.stringify({ error: "Invalid payload format" }));
                     return;
                 }
 
-
-                if (
-                    newState.layout !== "wait" &&
-                    newState.layout !== "start" &&
-                    newState.layout !== "end"
-                ) {
-
-                    console.log(
-                        "Invalid layout"
-                    );
-
-                    return;
-                }
-
-
-                state.layout =
-                    newState.layout;
-
-
-                console.log(
-                    "State changed:",
-                    state
-                );
-
-
-                // Broadcast state to everyone.
-
-                for (
-                    const client
-                    of wss.clients
-                ) {
+                // Privileged admin action: layout state modification
+                if (payload.layout !== undefined) {
+                    const token = payload.token || payload.adminToken;
+                    if (!verifyAdminToken(token)) {
+                        console.warn(`Rejected unauthorized state change from ${remoteAddress}`);
+                        socket.send(JSON.stringify({ error: "Unauthorized: Invalid admin token" }));
+                        return;
+                    }
 
                     if (
-                        client.readyState ===
-                        WebSocket.OPEN
+                        payload.layout !== "wait" &&
+                        payload.layout !== "start" &&
+                        payload.layout !== "end"
                     ) {
+                        socket.send(JSON.stringify({ error: "Invalid layout" }));
+                        return;
+                    }
 
-                        client.send(
-                            JSON.stringify(
-                                state
-                            )
-                        );
+                    state.layout = payload.layout;
+                    console.log("State changed by admin to:", state);
+
+                    // Broadcast state to everyone
+                    const broadcastMsg = JSON.stringify(state);
+                    for (const client of wss.clients) {
+                        if (client.readyState === WebSocket.OPEN) {
+                            client.send(broadcastMsg);
+                        }
                     }
                 }
             }
         );
+
+        socket.on("error", err => {
+            console.error("WebSocket client error:", err.message);
+        });
+
+        socket.on("close", () => {
+            console.log(`WebSocket client disconnected: ${remoteAddress}`);
+        });
     }
 );
 
 
 // ============================================================
-// Start server
+// In-Browser VM SSH TCP Proxy (127.0.0.1 loopback only)
 // ============================================================
 
-server.listen(
-    3001,
-    "0.0.0.0",
-    () => {
+const SSH_PORT = Number(process.env.SSH_PORT) || 2222;
+const SSH_HOST = "127.0.0.1";
 
+const sshServer = net.createServer((clientSocket) => {
+    console.log(`SSH TCP client connected from ${clientSocket.remoteAddress}:${clientSocket.remotePort}`);
+
+    // Find active VM tunnel (in single-team mode, find any active tunnel)
+    let targetWs = null;
+    let targetTeam = null;
+    for (const [tName, ws] of activeTunnels.entries()) {
+        if (ws.readyState === WebSocket.OPEN) {
+            targetWs = ws;
+            targetTeam = tName;
+            break;
+        }
+    }
+
+    if (!targetWs) {
+        console.warn("SSH client connected but no in-browser VM tunnel is active");
+        clientSocket.write("SSH-2.0-CTF_Platform\r\n");
+        clientSocket.end("Error: No challenge VM tunnel is connected in the browser. Please open the challenge page.\r\n");
+        return;
+    }
+
+    console.log(`Bridging SSH client to VM tunnel for team: ${targetTeam}`);
+
+    // Forward TCP -> WebSocket binary
+    clientSocket.on("data", (chunk) => {
+        if (targetWs.readyState === WebSocket.OPEN) {
+            targetWs.send(chunk);
+        }
+    });
+
+    // Forward WebSocket binary -> TCP
+    const onWsMessage = (data) => {
+        const buf = Buffer.isBuffer(data) ? data : Buffer.from(data);
+        clientSocket.write(buf);
+    };
+
+    targetWs.on("message", onWsMessage);
+
+    const cleanup = () => {
+        targetWs.off("message", onWsMessage);
+        clientSocket.destroy();
+    };
+
+    clientSocket.on("error", cleanup);
+    clientSocket.on("close", cleanup);
+    targetWs.on("close", cleanup);
+});
+
+// Start SSH server if not disabled (e.g. during specific unit tests)
+if (process.env.DISABLE_SSH_SERVER !== "1") {
+    sshServer.listen(SSH_PORT, SSH_HOST, () => {
+        console.log(`In-browser VM SSH proxy listening on ${SSH_HOST}:${SSH_PORT}`);
+    });
+}
+
+server.on("close", () => {
+    clearInterval(heartbeatInterval);
+    if (sshServer.listening) {
+        sshServer.close();
+    }
+});
+
+
+// ============================================================
+// Start server (loopback only)
+// ============================================================
+
+const HOST = process.env.HOST || "127.0.0.1";
+const PORT = Number(process.env.PORT) || 3001;
+
+server.listen(
+    PORT,
+    HOST,
+    () => {
         console.log(
-            "HTTP + WebSocket server running on port 3001"
+            `CTF Server running on http://${HOST}:${PORT}`
         );
 
         console.log(
             "Database:",
-            path.join(__dirname, "CTF_data/ctf.sqlite")
+            dbPath
+        );
+
+        console.log(
+            "Admin Token:",
+            ADMIN_TOKEN
         );
     }
 );
+
+export { server, wss, vmTunnelWss, sshServer, db, state, ADMIN_TOKEN, verifyAdminToken };

@@ -3,7 +3,7 @@
 
 <head>
   <title>Challenge 1</title>
-  <link rel="stylesheet" crossorigin href="/assets/main-B0SCFUcI.css">
+  <link rel="stylesheet" crossorigin href="/assets/main-CPHCY0dP.css">
 </head>
 
 <body>
@@ -19,6 +19,11 @@
     "use strict";
 
 
+    const isDev = location.port === "5173" || location.port === "5174";
+    const apiBase = isDev ? `http://${location.hostname}:3001` : "";
+    const wsProtocol = location.protocol === "https:" ? "wss:" : "ws:";
+    const wsHost = isDev ? `${location.hostname}:3001` : location.host;
+
     const challengeID = 1;
 
     const app =
@@ -30,6 +35,7 @@
     let eventStarted = false;
 
     let emulator = null;
+    let tunnelSocket = null;
 
 
     // ========================================================
@@ -42,7 +48,7 @@
 
         const response =
           await fetch(
-            `http://${location.hostname}:3001/session`,
+            `${apiBase}/session`,
             {
               credentials:
                 "include"
@@ -149,7 +155,7 @@
 
         const response =
           await fetch(
-            `http://${location.hostname}:3001/progress`,
+            `${apiBase}/progress`,
             {
               credentials:
                 "include"
@@ -388,11 +394,32 @@
         "result";
 
 
+      const sshInfo =
+        document.createElement(
+          "div"
+        );
+
+      sshInfo.id =
+        "ssh-status";
+
+      sshInfo.style.fontSize =
+        "13px";
+
+      sshInfo.style.marginTop =
+        "12px";
+
+      sshInfo.style.color =
+        "rgba(255, 255, 255, 0.75)";
+
+      sshInfo.innerHTML =
+        "Host SSH: <code style='background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px;'>ssh -p 2222 root@127.0.0.1</code>";
+
       dialog.append(
         label,
         flagInput,
         submitButton,
-        result
+        result,
+        sshInfo
       );
 
 
@@ -473,7 +500,7 @@
 
             const response =
               await fetch(
-                `http://${location.hostname}:3001/solve`,
+                `${apiBase}/solve`,
                 {
                   method:
                     "POST",
@@ -671,8 +698,7 @@
 
 
             alert(
-              "SHIT FAILED.\n\n" +
-              "Could not contact the CTF server."
+              "Error: Could not contact the CTF server."
             );
 
 
@@ -694,7 +720,7 @@
       emulator =
         window.emulator =
         new V86({
-          wasm_path: "./node_modules/v86/build/v86.wasm",
+          wasm_path: "/node_modules/v86/build/v86.wasm",
           memory_size: 64 * 1024 * 1024,
           vga_memory_size: 2 * 1024 * 1024,
 
@@ -712,6 +738,8 @@
             url: "/images/customBzImage",
           },
 
+          uart1: true,
+
           net_device: {
             type: "virtio",
             relay_url: "fetch",
@@ -720,7 +748,78 @@
           autostart: true,
         });
 
-      emulator.serial0_send("wget http://example.com/\n");
+      // ------------------------------------------------------
+      // In-browser VM SSH byte tunnel
+      // ------------------------------------------------------
+      if (tunnelSocket) {
+        tunnelSocket.close();
+        tunnelSocket = null;
+      }
+
+      function connectVMTunnel() {
+        if (!eventStarted || !emulator) return;
+        tunnelSocket = new WebSocket(`${wsProtocol}//${wsHost}/vm-tunnel`);
+        tunnelSocket.binaryType = "arraybuffer";
+
+        tunnelSocket.addEventListener("open", () => {
+          console.log("In-browser VM SSH tunnel connected to host server");
+          const statusEl = document.getElementById("ssh-status");
+          if (statusEl) {
+            statusEl.innerHTML = "Host SSH: <code style='background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px;'>ssh -p 2222 root@127.0.0.1</code> (Tunnel Active)";
+          }
+        });
+
+        tunnelSocket.addEventListener("message", (event) => {
+          if (emulator && event.data) {
+            const bytes = new Uint8Array(event.data);
+            emulator.serial_send_bytes(1, bytes);
+          }
+        });
+
+        let outBuffer = [];
+        let outTimer = null;
+
+        function flushSerialBuffer() {
+          if (outBuffer.length > 0 && tunnelSocket && tunnelSocket.readyState === WebSocket.OPEN) {
+            tunnelSocket.send(new Uint8Array(outBuffer));
+            outBuffer = [];
+          }
+          outTimer = null;
+        }
+
+        emulator.add_listener("serial1-output-byte", (byte) => {
+          outBuffer.push(byte);
+          if (outBuffer.length >= 256) {
+            flushSerialBuffer();
+          } else if (!outTimer) {
+            outTimer = setTimeout(flushSerialBuffer, 5);
+          }
+        });
+
+        tunnelSocket.addEventListener("close", () => {
+          console.log("VM SSH tunnel closed, reconnecting in 3s...");
+          if (eventStarted && emulator) {
+            setTimeout(connectVMTunnel, 3000);
+          }
+        });
+
+        tunnelSocket.addEventListener("error", (err) => {
+          console.warn("VM tunnel error:", err);
+        });
+      }
+
+      connectVMTunnel();
+
+      // Configure guest loopback, keys, and SSH bridge on boot
+      let vmConfigured = false;
+      emulator.add_listener("emulator-started", () => {
+        if (vmConfigured) return;
+        vmConfigured = true;
+        setTimeout(() => {
+          const initCmd = "ifconfig lo up && mkdir -p /etc/tinyssh && [ ! -f /etc/tinyssh/keydir/ed25519.pk ] && tinysshd-makekey /etc/tinyssh/keydir 2>/dev/null; [ ! -c /dev/ttyS1 ] && mknod /dev/ttyS1 c 4 65 2>/dev/null; socat TCP-LISTEN:22,fork,reuseaddr EXEC:\"/usr/sbin/tinysshd /etc/tinyssh/keydir\" & while true; do socat /dev/ttyS1,raw,echo=0 TCP:127.0.0.1:22; sleep 0.2; done &\n";
+          emulator.serial0_send(initCmd);
+        }, 4000);
+      });
     }
 
 
@@ -782,6 +881,11 @@
           null;
       }
 
+      if (tunnelSocket) {
+        tunnelSocket.close();
+        tunnelSocket = null;
+      }
+
 
       showClosedMessage();
     }
@@ -795,7 +899,7 @@
 
       const socket =
         new WebSocket(
-          `ws://${location.hostname}:3001`
+          `${wsProtocol}//${wsHost}`
         );
 
 

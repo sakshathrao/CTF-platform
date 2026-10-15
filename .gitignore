@@ -1,0 +1,13 @@
+# Dependencies
+# (Note: node_modules tracked historically; preserve if required by offline environment)
+
+# SQLite database and runtime data
+*.sqlite
+*.sqlite3
+*.db
+CTF_data/
+
+# Build caches & temp files
+.vite-temp/
+.DS_Store
+*.log

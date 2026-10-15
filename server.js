@@ -2092,6 +2092,15 @@ server.on("close", () => {
     }
 });
 
+server.on("error", (err) => {
+    if (err.code === "EADDRINUSE") {
+        console.error(`Error: Port ${PORT} is already in use. Stop the existing server process before starting a new one.`);
+    } else {
+        console.error("Server error:", err.message);
+    }
+    process.exit(1);
+});
+
 
 // ============================================================
 // Start server (loopback only)

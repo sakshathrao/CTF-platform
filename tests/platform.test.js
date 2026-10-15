@@ -15,6 +15,7 @@ const TEST_ADMIN_TOKEN = "test-secret-token-12345";
 process.env.ADMIN_TOKEN = TEST_ADMIN_TOKEN;
 process.env.HOST = "127.0.0.1";
 process.env.PORT = "3099";
+process.env.SSH_PORT = "2299";
 
 import net from "node:net";
 
@@ -53,6 +54,9 @@ function makeRequest(method, urlPath, headers = {}, body = null) {
 test.after(() => {
   server.close();
   wss.close();
+  if (sshServer && sshServer.listening) {
+    sshServer.close();
+  }
 });
 
 test("Database: schema, teams, and challenges are intact", () => {
@@ -219,8 +223,8 @@ test("VM Tunnel & SSH Proxy: authenticated tunnel forwards TCP <-> WS", async ()
       ws.once("error", reject);
     });
 
-    // Connect a test TCP client to SSH port (2222)
-    const tcpClient = net.createConnection({ host: "127.0.0.1", port: 2222 });
+    // Connect a test TCP client to SSH port (2299)
+    const tcpClient = net.createConnection({ host: "127.0.0.1", port: 2299 });
     await new Promise((resolve, reject) => {
       tcpClient.once("connect", resolve);
       tcpClient.once("error", reject);

@@ -7,6 +7,7 @@
     "ws": "^8.22.0"
   },
   "scripts": {
+    "dev": "vite",
     "start": "node server.js",
     "build": "vite build && node scripts/compress-assets.js",
     "compress": "node scripts/compress-assets.js",

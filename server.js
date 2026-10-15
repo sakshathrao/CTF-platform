@@ -1700,32 +1700,51 @@ const server =
 
             if (req.method === "GET") {
                 const distDir = path.join(__dirname, "dist");
-                if (existsSync(distDir)) {
-                    let urlPath;
-                    try {
-                        urlPath = decodeURIComponent(req.url.split("?")[0]);
-                    } catch {
-                        res.writeHead(400);
-                        res.end("Bad Request");
-                        return;
-                    }
+                const staticDir = existsSync(distDir) ? distDir : __dirname;
+                let urlPath;
+                try {
+                    urlPath = decodeURIComponent(req.url.split("?")[0]);
+                } catch {
+                    res.writeHead(400);
+                    res.end("Bad Request");
+                    return;
+                }
 
-                    if (urlPath.includes("..") || urlPath.startsWith("/..")) {
+                if (urlPath.includes("..") || urlPath.startsWith("/..")) {
+                    res.writeHead(403);
+                    res.end("Forbidden");
+                    return;
+                }
+
+                let cleanPath = urlPath.startsWith("/") ? urlPath.slice(1) : urlPath;
+                if (cleanPath === "" || cleanPath === "/") {
+                    cleanPath = "main.html";
+                }
+
+                // Prevent access to server code, DBs, and configs if falling back to project root
+                if (staticDir === __dirname) {
+                    const normalized = cleanPath.toLowerCase();
+                    if (
+                        normalized.startsWith(".") ||
+                        normalized.startsWith("server") ||
+                        normalized.startsWith("tests") ||
+                        normalized.includes("package") ||
+                        normalized.endsWith(".sqlite") ||
+                        normalized.endsWith(".db") ||
+                        normalized.endsWith(".env") ||
+                        normalized.endsWith(".md")
+                    ) {
                         res.writeHead(403);
                         res.end("Forbidden");
                         return;
                     }
+                }
 
-                    let cleanPath = urlPath.startsWith("/") ? urlPath.slice(1) : urlPath;
-                    if (cleanPath === "" || cleanPath === "/") {
-                        cleanPath = "main.html";
-                    }
+                const filePath = path.join(staticDir, cleanPath);
+                const resolvedPath = path.resolve(filePath);
+                const resolvedStatic = path.resolve(staticDir);
 
-                    const filePath = path.join(distDir, cleanPath);
-                    const resolvedPath = path.resolve(filePath);
-                    const resolvedDist = path.resolve(distDir);
-
-                    if ((resolvedPath.startsWith(resolvedDist + path.sep) || resolvedPath === resolvedDist) && existsSync(resolvedPath)) {
+                if ((resolvedPath.startsWith(resolvedStatic + path.sep) || resolvedPath === resolvedStatic) && existsSync(resolvedPath)) {
                         try {
                             const stats = statSync(resolvedPath);
                             if (!stats.isDirectory()) {
@@ -1790,7 +1809,6 @@ const server =
                         }
                     }
                 }
-            }
 
 
             // =================================================
@@ -2054,6 +2072,10 @@ const sshServer = net.createServer((clientSocket) => {
     clientSocket.on("error", cleanup);
     clientSocket.on("close", cleanup);
     targetWs.on("close", cleanup);
+});
+
+sshServer.on("error", (err) => {
+    console.error("SSH proxy server error:", err.message);
 });
 
 // Start SSH server if not disabled (e.g. during specific unit tests)

@@ -2,7 +2,7 @@ import http from "node:http";
 import net from "node:net";
 import crypto from "node:crypto";
 import path from "node:path";
-import { existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, statSync, createReadStream } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { DatabaseSync } from "node:sqlite";
 
@@ -1698,7 +1698,7 @@ const server =
             // Static file serving (dist/)
             // =================================================
 
-            if (req.method === "GET") {
+            if (req.method === "GET" || req.method === "HEAD") {
                 const distDir = path.join(__dirname, "dist");
                 const staticDir = existsSync(distDir) ? distDir : __dirname;
                 let urlPath;
@@ -1745,70 +1745,107 @@ const server =
                 const resolvedStatic = path.resolve(staticDir);
 
                 if ((resolvedPath.startsWith(resolvedStatic + path.sep) || resolvedPath === resolvedStatic) && existsSync(resolvedPath)) {
-                        try {
-                            const stats = statSync(resolvedPath);
-                            if (!stats.isDirectory()) {
-                                const ext = path.extname(resolvedPath).toLowerCase();
-                                const MIME_TYPES = {
-                                    ".html": "text/html; charset=utf-8",
-                                    ".css": "text/css; charset=utf-8",
-                                    ".js": "application/javascript; charset=utf-8",
-                                    ".mjs": "application/javascript; charset=utf-8",
-                                    ".json": "application/json",
-                                    ".png": "image/png",
-                                    ".jpg": "image/jpeg",
-                                    ".jpeg": "image/jpeg",
-                                    ".gif": "image/gif",
-                                    ".webp": "image/webp",
-                                    ".svg": "image/svg+xml",
-                                    ".ico": "image/x-icon",
-                                    ".wasm": "application/wasm",
-                                    ".bin": "application/octet-stream",
-                                    ".img": "application/octet-stream",
-                                    ".iso": "application/x-iso9660-image"
-                                };
-                                const contentType = MIME_TYPES[ext] || "application/octet-stream";
+                    try {
+                        const stats = statSync(resolvedPath);
+                        if (!stats.isDirectory()) {
+                            const ext = path.extname(resolvedPath).toLowerCase();
+                            const MIME_TYPES = {
+                                ".html": "text/html; charset=utf-8",
+                                ".css": "text/css; charset=utf-8",
+                                ".js": "application/javascript; charset=utf-8",
+                                ".mjs": "application/javascript; charset=utf-8",
+                                ".json": "application/json",
+                                ".png": "image/png",
+                                ".jpg": "image/jpeg",
+                                ".jpeg": "image/jpeg",
+                                ".gif": "image/gif",
+                                ".webp": "image/webp",
+                                ".svg": "image/svg+xml",
+                                ".ico": "image/x-icon",
+                                ".wasm": "application/wasm",
+                                ".bin": "application/octet-stream",
+                                ".img": "application/octet-stream",
+                                ".iso": "application/x-iso9660-image"
+                            };
+                            const contentType = MIME_TYPES[ext] || "application/octet-stream";
 
-                                // Content negotiation
-                                const acceptEncoding = (req.headers["accept-encoding"] || "")
-                                    .split(",")
-                                    .map(e => e.trim().split(";")[0].toLowerCase());
+                            res.setHeader("Accept-Ranges", "bytes");
 
-                                let servePath = resolvedPath;
-                                let encoding = null;
+                            // HTTP Range request support (essential for v86 chunked VM image loading)
+                            const rangeHeader = req.headers["range"];
+                            if (rangeHeader && req.method === "GET") {
+                                const totalSize = stats.size;
+                                const match = rangeHeader.match(/bytes=(\d+)-(\d*)/);
+                                if (match) {
+                                    const start = parseInt(match[1], 10);
+                                    const end = match[2] ? parseInt(match[2], 10) : totalSize - 1;
 
-                                if (acceptEncoding.includes("br") && existsSync(resolvedPath + ".br")) {
-                                    servePath = resolvedPath + ".br";
-                                    encoding = "br";
-                                } else if (acceptEncoding.includes("gzip") && existsSync(resolvedPath + ".gz")) {
-                                    servePath = resolvedPath + ".gz";
-                                    encoding = "gzip";
+                                    if (start < totalSize && end >= start) {
+                                        const endClamped = Math.min(end, totalSize - 1);
+                                        const chunkSize = (endClamped - start) + 1;
+                                        res.setHeader("Content-Type", contentType);
+                                        res.setHeader("Content-Range", `bytes ${start}-${endClamped}/${totalSize}`);
+                                        res.setHeader("Content-Length", chunkSize);
+                                        res.setHeader("Cache-Control", "public, max-age=3600");
+                                        res.writeHead(206);
+                                        createReadStream(resolvedPath, { start, end: endClamped }).pipe(res);
+                                        return;
+                                    } else {
+                                        res.setHeader("Content-Range", `bytes */${totalSize}`);
+                                        res.writeHead(416);
+                                        res.end();
+                                        return;
+                                    }
                                 }
+                            }
 
-                                res.setHeader("Vary", "Accept-Encoding");
-                                res.setHeader("Content-Type", contentType);
+                            // Content negotiation
+                            const acceptEncoding = (req.headers["accept-encoding"] || "")
+                                .split(",")
+                                .map(e => e.trim().split(";")[0].toLowerCase());
 
-                                if (encoding) {
-                                    res.setHeader("Content-Encoding", encoding);
-                                }
+                            let servePath = resolvedPath;
+                            let encoding = null;
 
-                                if (cleanPath.startsWith("assets/") && /\-[A-Za-z0-9_-]{8,}\.(js|css|png|webp|svg)$/.test(cleanPath)) {
-                                    res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
-                                } else if (cleanPath.endsWith(".html")) {
-                                    res.setHeader("Cache-Control", "no-cache");
-                                } else {
-                                    res.setHeader("Cache-Control", "public, max-age=3600");
-                                }
+                            if (acceptEncoding.includes("br") && existsSync(resolvedPath + ".br")) {
+                                servePath = resolvedPath + ".br";
+                                encoding = "br";
+                            } else if (acceptEncoding.includes("gzip") && existsSync(resolvedPath + ".gz")) {
+                                servePath = resolvedPath + ".gz";
+                                encoding = "gzip";
+                            }
 
+                            res.setHeader("Vary", "Accept-Encoding");
+                            res.setHeader("Content-Type", contentType);
+
+                            if (encoding) {
+                                res.setHeader("Content-Encoding", encoding);
+                            }
+
+                            if (cleanPath.startsWith("assets/") && /\-[A-Za-z0-9_-]{8,}\.(js|css|png|webp|svg)$/.test(cleanPath)) {
+                                res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+                            } else if (cleanPath.endsWith(".html")) {
+                                res.setHeader("Cache-Control", "no-cache");
+                            } else {
+                                res.setHeader("Cache-Control", "public, max-age=3600");
+                            }
+
+                            if (req.method === "HEAD") {
+                                res.setHeader("Content-Length", statSync(servePath).size);
                                 res.writeHead(200);
-                                res.end(readFileSync(servePath));
+                                res.end();
                                 return;
                             }
-                        } catch (err) {
-                            console.error("Static file error:", err);
+
+                            res.writeHead(200);
+                            res.end(readFileSync(servePath));
+                            return;
                         }
+                    } catch (err) {
+                        console.error("Static file error:", err);
                     }
                 }
+            }
 
 
             // =================================================

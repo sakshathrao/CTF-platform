@@ -258,23 +258,30 @@
           "div"
         );
 
-
       row.style.display =
         "flex";
 
       row.style.flexDirection =
         "row";
 
+      row.style.alignItems =
+        "flex-start";
+
       row.style.justifyContent =
-        "space-around";
+        "flex-start";
+
+      row.style.flexWrap =
+        "wrap";
 
       row.style.gap =
-        "30%";
+        "36px";
 
       row.style.paddingLeft = "6%";
 
+      row.style.paddingRight = "6%";
+
       // ------------------------------------------------------
-      // v86
+      // v86 Terminal Window
       // ------------------------------------------------------
 
       const screenContainer =
@@ -282,16 +289,39 @@
           "div"
         );
 
-
       screenContainer.id =
         "screen_container";
 
+      screenContainer.style.background = "#0c0d14";
+      screenContainer.style.border = "1px solid rgba(255, 255, 255, 0.16)";
+      screenContainer.style.borderRadius = "12px";
+      screenContainer.style.boxShadow = "0 16px 40px rgba(0, 0, 0, 0.65)";
+      screenContainer.style.overflow = "hidden";
+      screenContainer.style.minWidth = "640px";
+      screenContainer.style.maxWidth = "720px";
+      screenContainer.style.minHeight = "400px";
+      screenContainer.style.display = "flex";
+      screenContainer.style.flexDirection = "column";
+
+      const terminalBar =
+        document.createElement(
+          "div"
+        );
+
+      terminalBar.style.padding = "8px 14px";
+      terminalBar.style.background = "rgba(255, 255, 255, 0.05)";
+      terminalBar.style.borderBottom = "1px solid rgba(255, 255, 255, 0.08)";
+      terminalBar.style.display = "flex";
+      terminalBar.style.alignItems = "center";
+      terminalBar.style.gap = "8px";
+      terminalBar.style.font = "12px monospace";
+      terminalBar.style.color = "rgba(255, 255, 255, 0.75)";
+      terminalBar.innerHTML = "<span style='display:inline-block;width:10px;height:10px;border-radius:50%;background:#ef4444;'></span><span style='display:inline-block;width:10px;height:10px;border-radius:50%;background:#f59e0b;'></span><span style='display:inline-block;width:10px;height:10px;border-radius:50%;background:#10b981;'></span><span style='margin-left:6px;letter-spacing:0.5px;'>v86 Linux Console [i386]</span>";
 
       const screen =
         document.createElement(
           "div"
         );
-
 
       screen.style.whiteSpace =
         "pre";
@@ -300,24 +330,45 @@
         "14px monospace";
 
       screen.style.lineHeight =
-        "14px";
+        "16px";
 
+      screen.style.padding =
+        "10px";
+
+      screen.style.color =
+        "#4ade80";
+
+      screen.style.flex =
+        "1";
+
+      screen.style.minHeight =
+        "360px";
+
+      screen.style.background =
+        "#000000";
+
+      screen.style.overflow =
+        "auto";
 
       const canvas =
         document.createElement(
           "canvas"
         );
 
-
       canvas.style.display =
         "none";
 
+      canvas.style.width =
+        "100%";
+
+      canvas.style.height =
+        "auto";
 
       screenContainer.append(
+        terminalBar,
         screen,
         canvas
       );
-
 
       row.append(
         screenContainer
@@ -727,16 +778,18 @@
           screen_container: document.getElementById("screen_container"),
 
           bios: {
-            url: "images/seabios.bin",
+            url: "/images/seabios.bin",
           },
 
           vga_bios: {
-            url: "images/vgabios.bin",
+            url: "/images/vgabios.bin",
           },
 
           bzimage: {
             url: "/images/customBzImage",
           },
+
+          cmdline: "console=tty0 console=ttyS0 quiet",
 
           uart1: true,
 

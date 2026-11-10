@@ -13,6 +13,7 @@ export default defineConfig({
                 challenge4: "challenge4.html",
                 challenge5: "challenge5.html",
                 challenge6: "challenge6.html",
+                leaderboard: "leaderboard.html",
                 admin: "admin.html",
             },
         },

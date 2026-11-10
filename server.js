@@ -11,7 +11,7 @@ import WebSocket, {
     WebSocketServer
 } from "ws";
 
-import { challenges } from "./challenges.js";
+import { challenges, getVisibleChallenges } from "./challenges.js";
 
 
 // ============================================================
@@ -123,6 +123,23 @@ try {
     db.exec("ALTER TABLE challenges ADD COLUMN category TEXT;");
 } catch {}
 
+try {
+    db.exec("ALTER TABLE teams ADD COLUMN has_logged_in INTEGER DEFAULT 0;");
+} catch {}
+
+// Any team that already has an active session, points, or solves has logged in
+try {
+    db.prepare(`
+        UPDATE teams 
+        SET has_logged_in = 1 
+        WHERE name IN (SELECT team_name FROM sessions) 
+           OR points > 0 
+           OR name IN (SELECT team_name FROM solves)
+    `).run();
+} catch (err) {
+    console.warn("Could not sync has_logged_in:", err.message);
+}
+
 // Seed any challenges from challenges.js missing from the database
 try {
     const existingChallenges = new Set(
@@ -161,12 +178,91 @@ function verifyAdminToken(providedToken) {
 
 
 // ============================================================
-// CTF state
+// CTF state & Countdown Timer
 // ============================================================
 
 const state = {
-    layout: "wait"
+    layout: "wait",
+    timerEnd: null // Unix epoch timestamp (ms) or null
 };
+
+let timerTimeout = null;
+
+// Parse HH:MM:SS or HH:MM or numeric ms
+function parseDuration(input) {
+    if (typeof input === "number") {
+        return input > 0 ? input : null;
+    }
+    if (typeof input !== "string") return null;
+    const trimmed = input.trim();
+    if (!trimmed || trimmed === "0" || trimmed === "00:00:00" || trimmed.toLowerCase() === "clear") {
+        return null;
+    }
+
+    // HH:MM:SS format
+    const parts = trimmed.split(":").map(p => Number(p));
+    if (parts.length === 3 && parts.every(p => !isNaN(p) && p >= 0)) {
+        const [hours, minutes, seconds] = parts;
+        const totalMs = (hours * 3600 + minutes * 60 + seconds) * 1000;
+        return totalMs > 0 ? totalMs : null;
+    }
+    // MM:SS format
+    if (parts.length === 2 && parts.every(p => !isNaN(p) && p >= 0)) {
+        const [minutes, seconds] = parts;
+        const totalMs = (minutes * 60 + seconds) * 1000;
+        return totalMs > 0 ? totalMs : null;
+    }
+    // Pure integer seconds
+    if (/^\d+$/.test(trimmed)) {
+        const secs = parseInt(trimmed, 10);
+        return secs > 0 ? secs * 1000 : null;
+    }
+    return null;
+}
+
+// Map of teamName -> active WebSocket tunnel
+const activeTunnels = new Map();
+
+function closeAllVMTunnels(reason = "Event ended") {
+    for (const [teamName, ws] of activeTunnels.entries()) {
+        try {
+            ws.close(1000, reason);
+        } catch {}
+    }
+    activeTunnels.clear();
+}
+
+function setEventTimer(durationMs) {
+    if (timerTimeout) {
+        clearTimeout(timerTimeout);
+        timerTimeout = null;
+    }
+
+    if (typeof durationMs !== "number" || durationMs <= 0) {
+        state.timerEnd = null;
+        console.log("Event timer cleared.");
+        return;
+    }
+
+    state.timerEnd = Date.now() + durationMs;
+    state.layout = "start";
+    console.log(`Event timer set for ${durationMs}ms (ends at ${new Date(state.timerEnd).toISOString()})`);
+
+    timerTimeout = setTimeout(() => {
+        if (state.layout === "start") {
+            state.layout = "end";
+            state.timerEnd = null;
+            closeAllVMTunnels("Event ended");
+            console.log("Timer expired: Event automatically ended.");
+            const broadcastMsg = JSON.stringify(state);
+            for (const client of wss.clients) {
+                if (client.readyState === WebSocket.OPEN) {
+                    client.send(broadcastMsg);
+                }
+            }
+        }
+    }, durationMs);
+}
 
 // Rate limiting: track requests per team/session
 const rateLimitMap = new Map();
@@ -842,7 +938,7 @@ const server =
 
                 try {
 
-                    db.exec("BEGIN");
+                    db.exec("BEGIN IMMEDIATE");
 
 
                     db.prepare(`
@@ -883,6 +979,10 @@ const server =
                             teamName
                         );
 
+                    db.prepare(`
+                        UPDATE teams SET has_logged_in = 1 WHERE name = ?
+                    `).run(teamName);
+
 
                     db.exec("COMMIT");
 
@@ -922,9 +1022,10 @@ const server =
                     } catch {}
 
                     if (
-                        error?.code?.startsWith(
-                            "SQLITE_CONSTRAINT"
-                        )
+                        error?.code === "ERR_SQLITE_ERROR" ||
+                        error?.errcode === 1555 ||
+                        error?.code?.startsWith("SQLITE_CONSTRAINT") ||
+                        error?.message?.includes("UNIQUE constraint failed")
                     ) {
 
                         sendJSON(
@@ -1086,6 +1187,10 @@ const server =
                         createSession(
                             teamName
                         );
+
+                    db.prepare(`
+                        UPDATE teams SET has_logged_in = 1 WHERE name = ?
+                    `).run(teamName);
 
 
                     res.writeHead(
@@ -1368,12 +1473,23 @@ const server =
                 }
 
                 // Don't allow submissions while
-                // the event isn't running.
+                // the event isn't running or timer has expired.
 
                 if (
-                    state.layout !==
-                    "start"
+                    state.layout !== "start" ||
+                    (state.timerEnd && Date.now() >= state.timerEnd)
                 ) {
+                    if (state.timerEnd && Date.now() >= state.timerEnd && state.layout === "start") {
+                        state.layout = "end";
+                        state.timerEnd = null;
+                        closeAllVMTunnels("Event ended");
+                        const broadcastMsg = JSON.stringify(state);
+                        for (const client of wss.clients) {
+                            if (client.readyState === WebSocket.OPEN) {
+                                client.send(broadcastMsg);
+                            }
+                        }
+                    }
 
                     sendJSON(
                         res,
@@ -1500,6 +1616,33 @@ const server =
                         {
                             error:
                                 "Challenge already solved."
+                        }
+                    );
+
+                    return;
+                }
+
+
+                // Check whether this challenge is unlocked for this team
+                // (challenges in each category must be solved in serial order).
+
+                const solvedRows = db.prepare(`
+                    SELECT challenge_id
+                    FROM solves
+                    WHERE team_name = ?
+                `).all(teamName);
+
+                const solvedSet = new Set(solvedRows.map(r => r.challenge_id));
+                const unlockedChallenges = getVisibleChallenges(challenges, solvedSet);
+
+                if (!unlockedChallenges.some(c => c.id === challengeID)) {
+
+                    sendJSON(
+                        res,
+                        403,
+                        {
+                            error:
+                                "Challenge is locked. You must solve preceding challenges in this category first."
                         }
                     );
 
@@ -1787,6 +1930,16 @@ const server =
                         }
                     }
 
+                    // Also broadcast real-time leaderboard update notification to all clients
+                    const lbBroadcast = JSON.stringify({
+                        type: "leaderboard_update"
+                    });
+                    for (const client of wss.clients) {
+                        if (client.readyState === WebSocket.OPEN) {
+                            client.send(lbBroadcast);
+                        }
+                    }
+
 
                     console.log(
                         `${teamName} solved challenge ${challengeID} for ${pointsAwarded} points`
@@ -1844,12 +1997,35 @@ const server =
                 }
 
                 const newLayout = bodyData.layout;
-                if (newLayout !== "wait" && newLayout !== "start" && newLayout !== "end") {
+                if (newLayout && newLayout !== "wait" && newLayout !== "start" && newLayout !== "end") {
                     sendJSON(res, 400, { error: "Invalid layout. Must be 'wait', 'start', or 'end'." });
                     return;
                 }
 
-                state.layout = newLayout;
+                const durationProvided = bodyData.duration !== undefined;
+                const durationMs = durationProvided ? parseDuration(bodyData.duration) : null;
+
+                // Constraint: if the event duration value isn't null, the only state that can be set is start
+                if (durationProvided && durationMs !== null) {
+                    if (newLayout && newLayout !== "start") {
+                        sendJSON(res, 400, { error: "If event duration is set, the only state that can be set is 'start'." });
+                        return;
+                    }
+                }
+
+                if (newLayout) {
+                    state.layout = newLayout;
+                } else if (durationProvided && durationMs !== null) {
+                    state.layout = "start";
+                }
+
+                if (durationProvided) {
+                    setEventTimer(durationMs);
+                } else if (newLayout === "end" || newLayout === "wait") {
+                    setEventTimer(null);
+                    closeAllVMTunnels(`Event stopped (${newLayout})`);
+                }
+
                 console.log("State updated via HTTP admin to:", state);
 
                 const broadcastMsg = JSON.stringify(state);
@@ -1860,6 +2036,51 @@ const server =
                 }
 
                 sendJSON(res, 200, { success: true, state });
+                return;
+            }
+
+
+            // =================================================
+            // LEADERBOARD (JSON API)
+            // =================================================
+
+            if (
+                req.method === "GET" &&
+                (req.url === "/api/leaderboard" || req.url === "/leaderboard/data" || req.url === "/leaderboard.json")
+            ) {
+                const currentTeam = getTeamFromSession(req);
+
+                const rows = db.prepare(`
+                    SELECT 
+                        t.name,
+                        t.points,
+                        (SELECT COUNT(*) FROM solves s WHERE s.team_name = t.name) AS solve_count,
+                        (CASE WHEN EXISTS (SELECT 1 FROM sessions sess WHERE sess.team_name = t.name) THEN 1 ELSE 0 END) AS is_online,
+                        t.member1_name,
+                        t.member2_name,
+                        t.member3_name
+                    FROM teams t
+                    WHERE t.has_logged_in = 1 OR EXISTS (SELECT 1 FROM sessions sess WHERE sess.team_name = t.name)
+                    ORDER BY t.points DESC, solve_count DESC, t.name ASC
+                `).all();
+
+                const leaderboard = rows.map((row, idx) => ({
+                    rank: idx + 1,
+                    name: row.name,
+                    points: row.points,
+                    solveCount: row.solve_count,
+                    isOnline: Boolean(row.is_online),
+                    isCurrentTeam: currentTeam === row.name,
+                    members: [row.member1_name, row.member2_name, row.member3_name].filter(Boolean)
+                }));
+
+                sendJSON(res, 200, {
+                    leaderboard,
+                    currentTeam,
+                    timerEnd: state.timerEnd,
+                    layout: state.layout
+                });
+
                 return;
             }
 
@@ -1919,6 +2140,15 @@ const server =
                 let filePath = path.join(staticDir, cleanPath);
                 let resolvedPath = path.resolve(filePath);
                 const resolvedStatic = path.resolve(staticDir);
+
+                // Fallback to .html extension for clean URLs (e.g. /leaderboard -> /leaderboard.html)
+                if (!existsSync(resolvedPath) && !path.extname(cleanPath)) {
+                    const htmlPath = path.resolve(path.join(staticDir, cleanPath + ".html"));
+                    if (existsSync(htmlPath)) {
+                        resolvedPath = htmlPath;
+                        cleanPath = cleanPath + ".html";
+                    }
+                }
 
                 // Auto-sync missing runtime assets (node_modules or images) if staticDir is dist
                 if (!existsSync(resolvedPath) && staticDir === distDir) {
@@ -2086,8 +2316,7 @@ wss.on("close", () => {
     clearInterval(heartbeatInterval);
 });
 
-// Map of teamName -> active WebSocket tunnel
-const activeTunnels = new Map();
+// Active tunnels map and helper declared above
 
 vmTunnelWss.on("connection", (socket, request, teamName) => {
     console.log(`VM tunnel WebSocket connected for team: ${teamName}`);
@@ -2122,6 +2351,14 @@ server.on("upgrade", (request, socket, head) => {
             socket.destroy();
             return;
         }
+
+        // Reject VM tunnel access if event is not live or timer has expired
+        if (state.layout !== "start" || (state.timerEnd && Date.now() >= state.timerEnd)) {
+            socket.write("HTTP/1.1 403 Forbidden\r\n\r\n");
+            socket.destroy();
+            return;
+        }
+
         vmTunnelWss.handleUpgrade(request, socket, head, (ws) => {
             vmTunnelWss.emit("connection", ws, request, teamName);
         });
@@ -2221,8 +2458,8 @@ wss.on(
                     return;
                 }
 
-                // Privileged admin action: layout state modification
-                if (payload.layout !== undefined) {
+                // Privileged admin action: layout state and/or timer modification
+                if (payload.layout !== undefined || payload.duration !== undefined) {
                     const token = payload.token || payload.adminToken;
                     if (!verifyAdminToken(token)) {
                         console.warn(`Rejected unauthorized state change from ${remoteAddress}`);
@@ -2231,6 +2468,7 @@ wss.on(
                     }
 
                     if (
+                        payload.layout !== undefined &&
                         payload.layout !== "wait" &&
                         payload.layout !== "start" &&
                         payload.layout !== "end"
@@ -2239,7 +2477,30 @@ wss.on(
                         return;
                     }
 
-                    state.layout = payload.layout;
+                    const durationProvided = payload.duration !== undefined;
+                    const durationMs = durationProvided ? parseDuration(payload.duration) : null;
+
+                    // Constraint: if the event duration value isn't null, the only state that can be set is start
+                    if (durationProvided && durationMs !== null) {
+                        if (payload.layout !== undefined && payload.layout !== "start") {
+                            socket.send(JSON.stringify({ error: "If event duration is set, the only state that can be set is 'start'." }));
+                            return;
+                        }
+                    }
+
+                    if (payload.layout !== undefined) {
+                        state.layout = payload.layout;
+                    } else if (durationProvided && durationMs !== null) {
+                        state.layout = "start";
+                    }
+
+                    if (durationProvided) {
+                        setEventTimer(durationMs);
+                    } else if (payload.layout === "end" || payload.layout === "wait") {
+                        setEventTimer(null);
+                        closeAllVMTunnels(`Event stopped (${payload.layout})`);
+                    }
+
                     console.log("State changed by admin to:", state);
 
                     // Broadcast state to everyone
@@ -2297,6 +2558,14 @@ function makeSSHDisconnectPacket(reason) {
 
 const sshServer = net.createServer((clientSocket) => {
     console.log(`SSH TCP client connected from ${clientSocket.remoteAddress}:${clientSocket.remotePort}`);
+
+    if (state.layout !== "start" || (state.timerEnd && Date.now() >= state.timerEnd)) {
+        console.warn("SSH client connected but CTF event is not running");
+        clientSocket.write("SSH-2.0-CTF_Platform\r\n");
+        clientSocket.write(makeSSHDisconnectPacket("CTF event is not running."));
+        clientSocket.end();
+        return;
+    }
 
     // Find active VM tunnel (in single-team mode, find any active tunnel)
     let targetWs = null;
@@ -2406,4 +2675,4 @@ server.listen(
     }
 );
 
-export { server, wss, vmTunnelWss, sshServer, db, state, ADMIN_TOKEN, verifyAdminToken };
+export { server, wss, vmTunnelWss, sshServer, db, state, ADMIN_TOKEN, verifyAdminToken, parseDuration, setEventTimer };

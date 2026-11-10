@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CTF - Leaderboard</title>
+  <script type="module" crossorigin src="/assets/leaderboard-C8Livm_z.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/modulepreload-polyfill-P2Xu9kJm.js">
+  <link rel="stylesheet" crossorigin href="/assets/main-g3urCRJu.css">
+</head>
+
+<body>
+
+  <!-- Top-Right Countdown Timer -->
+  <div class="topRightTimer" id="topRightTimer">
+    <span class="timerLabel" id="timerLabel">Time Remaining:</span>
+    <span class="timerDigits" id="timerDigits">--:--:--</span>
+  </div>
+
+  <div class="main_bg start" id="app">
+    <div style="margin-bottom: 24px;">
+      <a href="/main.html" class="backLink">← Challenges</a>
+    </div>
+
+    <h1small>Leaderboard.</h1small>
+
+    <div class="leaderboardContainer">
+      <table class="leaderboardTable">
+        <thead>
+          <tr>
+            <th style="width: 50px;">#</th>
+            <th>Team</th>
+            <th style="width: 120px; text-align: center;">Solves</th>
+            <th style="width: 140px; text-align: right;">Points</th>
+          </tr>
+        </thead>
+        <tbody id="leaderboardBody">
+          <!-- Dynamically populated -->
+        </tbody>
+      </table>
+      <div id="emptyMessage" style="display: none; padding: 40px; text-align: center; color: #6b7280; font-family: Jost; font-size: 16px;">
+        No teams have logged in yet.
+      </div>
+    </div>
+  </div>
+
+</body>
+
+</html>

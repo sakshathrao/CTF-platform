@@ -21,11 +21,22 @@
         <option value="end">End (Event Closed)</option>
       </select>
 
-      <button id="update" type="button">Update State</button>
+      <div style="width: 100%; display: flex; flex-direction: column; gap: 6px;">
+        <label for="eventDuration" style="font-size: 13px; color: rgba(255, 255, 255, 0.7); text-align: left;">
+          Event Duration (HH:MM:SS):
+        </label>
+        <input type="text" id="eventDuration" placeholder="HH:MM:SS (e.g. 01:30:00)" style="width: 100%;">
+        <div id="adminTimerPreview" style="font-size: 12px; color: rgba(255, 255, 255, 0.5); text-align: left;">No timer active</div>
+      </div>
+
+      <button id="update" type="button">Update State &amp; Timer</button>
 
       <div id="statusMessage" style="font-size: 14px; min-height: 20px;"></div>
 
-      <a href="main.html">Back to Dashboard ↗</a>
+      <div style="display: flex; gap: 18px; margin-top: 10px;">
+        <a href="main.html">Dashboard ↗</a>
+        <a href="leaderboard.html">Leaderboard ↗</a>
+      </div>
     </div>
   </div>
 

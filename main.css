@@ -703,3 +703,138 @@ select:focus-visible {
     scroll-behavior: auto !important;
   }
 }
+
+/* ============================================================
+   Top-Right Clean Countdown Timer
+   ============================================================ */
+
+.topRightTimer {
+  position: fixed;
+  top: 36px;
+  right: 48px;
+  z-index: 100;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-family: Jost, Inter, sans-serif;
+  user-select: none;
+}
+
+.timerLabel {
+  font-size: 14px;
+  font-weight: 300;
+  color: #9ca3af;
+  letter-spacing: 0.5px;
+}
+
+.timerDigits {
+  font-size: 28px;
+  font-weight: 500;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  color: #f3f4f6;
+  letter-spacing: 1.5px;
+}
+
+.timerDigits.ended {
+  color: #ef4444;
+}
+
+/* ============================================================
+   Leaderboard Styles (Consistent with Platform Aesthetic)
+   ============================================================ */
+
+.backLink {
+  color: #9ca3af;
+  text-decoration: none;
+  font-family: Jost, Inter, sans-serif;
+  font-size: 15px;
+  font-weight: 300;
+  transition: color 0.2s ease;
+}
+
+.backLink:hover {
+  color: #ffffff;
+}
+
+.leaderboardContainer {
+  min-width: 85vw;
+  max-width: 85vw;
+  margin-top: 30px;
+  margin-bottom: 60px;
+  backdrop-filter: blur(16px) saturate(260%) brightness(0.7);
+  background: linear-gradient(270deg, transparent 10%, #0d151e 30%, transparent);
+  border-radius: 15px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 24px 32px;
+  box-sizing: border-box;
+}
+
+.leaderboardTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: Jost, Inter, sans-serif;
+  color: #ffffff;
+}
+
+.leaderboardTable th {
+  padding: 12px 16px;
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0.5px;
+  color: #9ca3af;
+  text-align: left;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.leaderboardTable td {
+  padding: 16px;
+  font-size: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  vertical-align: middle;
+}
+
+.leaderboardRow:last-child td {
+  border-bottom: none;
+}
+
+.leaderboardRow:hover {
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.leaderboardRow.currentUserTeam {
+  background: rgba(56, 189, 248, 0.05);
+}
+
+.rankNum {
+  font-size: 15px;
+  font-weight: 500;
+  color: #9ca3af;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.teamName {
+  font-weight: 400;
+  font-size: 17px;
+  color: #ffffff;
+}
+
+.teamMembers {
+  font-size: 12px;
+  color: #6b7280;
+  margin-top: 2px;
+}
+
+.solveCount {
+  text-align: center;
+  color: #d1d5db;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 15px;
+}
+
+.pointsCount {
+  text-align: right;
+  font-weight: 500;
+  font-size: 17px;
+  color: #ffffff;
+  font-family: 'JetBrains Mono', monospace;
+}

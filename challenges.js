@@ -61,7 +61,8 @@ export const challenges = [
 ];
 
 export function getVisibleChallenges(allChallenges = challenges, solvedIds = new Set()) {
-    const solvedSet = solvedIds instanceof Set ? solvedIds : new Set(solvedIds || []);
+    const rawIds = solvedIds instanceof Set ? Array.from(solvedIds) : (solvedIds || []);
+    const solvedSet = new Set(rawIds.map(id => Number(id)));
 
     const categoryMap = new Map();
     for (const challenge of allChallenges) {
@@ -74,12 +75,12 @@ export function getVisibleChallenges(allChallenges = challenges, solvedIds = new
 
     const visibleSet = new Set();
     for (const [, chList] of categoryMap.entries()) {
-        const solvedCount = chList.filter(c => solvedSet.has(c.id)).length;
+        const solvedCount = chList.filter(c => solvedSet.has(Number(c.id))).length;
         const countToShow = Math.min(chList.length, 1 + solvedCount);
         for (let i = 0; i < countToShow; i++) {
-            visibleSet.add(chList[i].id);
+            visibleSet.add(Number(chList[i].id));
         }
     }
 
-    return allChallenges.filter(c => visibleSet.has(c.id));
+    return allChallenges.filter(c => visibleSet.has(Number(c.id)));
 }

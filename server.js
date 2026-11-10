@@ -3,7 +3,7 @@ import net from "node:net";
 import os from "node:os";
 import crypto from "node:crypto";
 import path from "node:path";
-import { existsSync, mkdirSync, readFileSync, statSync, createReadStream } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, statSync, createReadStream, copyFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { DatabaseSync } from "node:sqlite";
 
@@ -38,6 +38,43 @@ const dbPath = candidateDbPaths.find(p => existsSync(p)) || candidateDbPaths[1] 
 const dbDir = path.dirname(dbPath);
 if (!existsSync(dbDir)) {
     mkdirSync(dbDir, { recursive: true });
+}
+
+// Ensure v86 runtime assets exist in dist if dist directory exists
+const distDir = path.join(__dirname, "dist");
+const distV86Dir = path.join(distDir, "node_modules", "v86", "build");
+const srcV86Dir = path.join(__dirname, "node_modules", "v86", "build");
+if (existsSync(distDir) && existsSync(srcV86Dir)) {
+    try {
+        if (!existsSync(distV86Dir)) {
+            mkdirSync(distV86Dir, { recursive: true });
+        }
+        for (const file of ["libv86.js", "libv86.mjs", "v86.wasm", "v86-fallback.wasm"]) {
+            const srcFile = path.join(srcV86Dir, file);
+            const dstFile = path.join(distV86Dir, file);
+            if (existsSync(srcFile) && !existsSync(dstFile)) {
+                copyFileSync(srcFile, dstFile);
+            }
+        }
+
+        // Ensure kernel and bios images exist in dist/images
+        const distImagesDir = path.join(distDir, "images");
+        const srcImagesDir = path.join(__dirname, "public", "images");
+        if (existsSync(srcImagesDir)) {
+            if (!existsSync(distImagesDir)) {
+                mkdirSync(distImagesDir, { recursive: true });
+            }
+            for (const file of ["bzImageSSH", "customBzImage", "seabios.bin", "vgabios.bin"]) {
+                const srcFile = path.join(srcImagesDir, file);
+                const dstFile = path.join(distImagesDir, file);
+                if (existsSync(srcFile) && !existsSync(dstFile)) {
+                    copyFileSync(srcFile, dstFile);
+                }
+            }
+        }
+    } catch {
+        // Ignore packaging sync errors during boot
+    }
 }
 
 const db = new DatabaseSync(dbPath);
@@ -267,10 +304,10 @@ function setSecurityHeaders(
     // Referrer policy
     res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
     // Content Security Policy - restrict script sources to self
-    // Note: v86 loads scripts from node_modules, so we allow that
+    // Note: v86 loads scripts from node_modules and requires wasm compilation
     res.setHeader("Content-Security-Policy", 
         "default-src 'self'; " +
-        "script-src 'self' 'unsafe-inline' blob: data:; " +
+        "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' blob: data:; " +
         "style-src 'self' 'unsafe-inline'; " +
         "img-src 'self' data: blob:; " +
         "connect-src 'self' ws: wss:; " +
@@ -1711,6 +1748,12 @@ const server =
                     return;
                 }
 
+                if (urlPath === "/favicon.ico" && !existsSync(path.join(staticDir, "favicon.ico"))) {
+                    res.writeHead(204);
+                    res.end();
+                    return;
+                }
+
                 if (urlPath.includes("..") || urlPath.startsWith("/..")) {
                     res.writeHead(403);
                     res.end("Forbidden");
@@ -1741,9 +1784,26 @@ const server =
                     }
                 }
 
-                const filePath = path.join(staticDir, cleanPath);
-                const resolvedPath = path.resolve(filePath);
+                let filePath = path.join(staticDir, cleanPath);
+                let resolvedPath = path.resolve(filePath);
                 const resolvedStatic = path.resolve(staticDir);
+
+                // Auto-sync missing runtime assets (node_modules or images) if staticDir is dist
+                if (!existsSync(resolvedPath) && staticDir === distDir) {
+                    let sourcePath = null;
+                    if (cleanPath.startsWith("node_modules/")) {
+                        sourcePath = path.resolve(path.join(__dirname, cleanPath));
+                    } else if (cleanPath.startsWith("images/")) {
+                        sourcePath = path.resolve(path.join(__dirname, "public", cleanPath));
+                    }
+                    const rootDir = path.resolve(__dirname);
+                    if (sourcePath && (sourcePath.startsWith(rootDir + path.sep) || sourcePath === rootDir) && existsSync(sourcePath)) {
+                        try {
+                            mkdirSync(path.dirname(resolvedPath), { recursive: true });
+                            copyFileSync(sourcePath, resolvedPath);
+                        } catch {}
+                    }
+                }
 
                 if ((resolvedPath.startsWith(resolvedStatic + path.sep) || resolvedPath === resolvedStatic) && existsSync(resolvedPath)) {
                     try {
@@ -2068,6 +2128,26 @@ const PORT = Number(process.env.PORT) || 3001;
 const SSH_PORT = Number(process.env.SSH_PORT) || 2222;
 const SSH_HOST = process.env.SSH_HOST || (HOST === "0.0.0.0" ? "0.0.0.0" : "127.0.0.1");
 
+function makeSSHDisconnectPacket(reason) {
+    const reasonBuf = Buffer.from(reason, "utf8");
+    const payloadLen = 1 + 4 + 4 + reasonBuf.length + 4;
+    const unpadded = 5 + payloadLen;
+    let padLen = 8 - (unpadded % 8);
+    if (padLen < 4) padLen += 8;
+    const packetLen = 1 + payloadLen + padLen;
+
+    const buf = Buffer.alloc(4 + packetLen);
+    let offset = 0;
+    buf.writeUInt32BE(packetLen, offset); offset += 4;
+    buf.writeUInt8(padLen, offset); offset += 1;
+    buf.writeUInt8(1, offset); offset += 1; // SSH_MSG_DISCONNECT
+    buf.writeUInt32BE(11, offset); offset += 4; // SSH_DISCONNECT_BY_APPLICATION
+    buf.writeUInt32BE(reasonBuf.length, offset); offset += 4;
+    reasonBuf.copy(buf, offset); offset += reasonBuf.length;
+    buf.writeUInt32BE(0, offset);
+    return buf;
+}
+
 const sshServer = net.createServer((clientSocket) => {
     console.log(`SSH TCP client connected from ${clientSocket.remoteAddress}:${clientSocket.remotePort}`);
 
@@ -2085,7 +2165,8 @@ const sshServer = net.createServer((clientSocket) => {
     if (!targetWs) {
         console.warn("SSH client connected but no in-browser VM tunnel is active");
         clientSocket.write("SSH-2.0-CTF_Platform\r\n");
-        clientSocket.end("Error: No challenge VM tunnel is connected in the browser. Please open the challenge page.\r\n");
+        clientSocket.write(makeSSHDisconnectPacket("No challenge VM tunnel is connected in the browser. Please open the challenge page."));
+        clientSocket.end();
         return;
     }
 

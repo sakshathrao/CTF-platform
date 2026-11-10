@@ -135,6 +135,23 @@ test("HTTP: Static file content negotiation and Vary: Accept-Encoding", async ()
   assert.equal(resNone.headers["content-encoding"], undefined);
 });
 
+test("HTTP: v86 assets, WebAssembly fallback, and CSP wasm-unsafe-eval are accessible", async () => {
+  const resWasm = await makeRequest("GET", "/node_modules/v86/build/v86.wasm");
+  assert.equal(resWasm.statusCode, 200);
+  assert.equal(resWasm.headers["content-type"], "application/wasm");
+
+  const resFallback = await makeRequest("GET", "/node_modules/v86/build/v86-fallback.wasm");
+  assert.equal(resFallback.statusCode, 200);
+  assert.equal(resFallback.headers["content-type"], "application/wasm");
+
+  const resLib = await makeRequest("GET", "/node_modules/v86/build/libv86.js");
+  assert.equal(resLib.statusCode, 200);
+  assert.equal(resLib.headers["content-type"], "application/javascript; charset=utf-8");
+
+  // Verify CSP allows wasm compilation
+  assert.match(resLib.headers["content-security-policy"] || "", /'wasm-unsafe-eval'/);
+});
+
 test("WebSocket: sends initial state and rejects unauthorized changes", async () => {
   const ws = new WebSocket("ws://127.0.0.1:3099");
 
@@ -193,6 +210,27 @@ test("Assets: background PNG preserves exact dimensions and is optimized", () =>
   const out = execSync(`identify "${bgPath}"`).toString();
   assert.match(out, /6716x3748/, "Dimensions are preserved at exactly 6716x3748");
   assert.match(out, /PNG/, "Image format is PNG");
+});
+
+test("SSH Proxy: cleanly sends SSH banner and SSH_MSG_DISCONNECT when no tunnel active", async () => {
+  const tcpClient = net.createConnection({ host: "127.0.0.1", port: 2299 });
+  const data = await new Promise((resolve) => {
+    let chunks = Buffer.alloc(0);
+    tcpClient.on("data", chunk => { chunks = Buffer.concat([chunks, chunk]); });
+    tcpClient.on("end", () => resolve(chunks));
+  });
+
+  const banner = data.toString("utf8", 0, data.indexOf("\r\n"));
+  assert.equal(banner, "SSH-2.0-CTF_Platform");
+
+  // Verify binary packet starts after \r\n and has message type 1 (SSH_MSG_DISCONNECT)
+  const packetStart = data.indexOf("\r\n") + 2;
+  const packet = data.subarray(packetStart);
+  assert.ok(packet.length >= 8, "Packet length is valid");
+  const packetLen = packet.readUInt32BE(0);
+  assert.equal(packetLen + 4, packet.length, "Packet length matches buffer");
+  const msgType = packet.readUInt8(5);
+  assert.equal(msgType, 1, "Message type is SSH_MSG_DISCONNECT (1)");
 });
 
 test("VM Tunnel: /vm-tunnel rejects unauthenticated WebSocket connections", async () => {

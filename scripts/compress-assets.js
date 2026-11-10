@@ -26,7 +26,7 @@ async function copyV86Assets() {
 
   if (existsSync(v86SrcDir)) {
     await mkdir(v86DstDir, { recursive: true });
-    for (const file of ['libv86.js', 'v86.wasm']) {
+    for (const file of ['libv86.js', 'libv86.mjs', 'v86.wasm', 'v86-fallback.wasm']) {
       const src = join(v86SrcDir, file);
       const dst = join(v86DstDir, file);
       if (existsSync(src)) {

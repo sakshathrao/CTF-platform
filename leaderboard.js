@@ -8,11 +8,19 @@ let currentTeam = null;
 let timerEnd = null;
 let timerInterval = null;
 let currentLayout = "wait";
+let cachedLeaderboardData = [];
 
 const timerDigits = document.getElementById("timerDigits");
 const timerLabel = document.getElementById("timerLabel");
 const leaderboardBody = document.getElementById("leaderboardBody");
 const emptyMessage = document.getElementById("emptyMessage");
+
+function hasSessionCookie() {
+    return document.cookie.split(";").some(c => {
+        const trimmed = c.trim();
+        return trimmed.startsWith("session=") && trimmed.length > 8;
+    });
+}
 
 function formatTime(totalSeconds) {
     if (totalSeconds <= 0) return "00:00:00";
@@ -73,9 +81,8 @@ async function fetchLeaderboard() {
         if (!res.ok) return;
 
         const data = await res.json();
-        if (data.currentTeam) {
-            currentTeam = data.currentTeam;
-        }
+        currentTeam = data.currentTeam || null;
+
         if (data.layout) {
             currentLayout = data.layout;
         }
@@ -84,7 +91,8 @@ async function fetchLeaderboard() {
             updateCountdown();
         }
 
-        renderLeaderboard(data.leaderboard || []);
+        cachedLeaderboardData = data.leaderboard || [];
+        renderLeaderboard(cachedLeaderboardData);
     } catch (err) {
         console.error("Could not fetch leaderboard data:", err);
     }
@@ -166,7 +174,7 @@ function connectWebSocket() {
     socket.addEventListener("message", (event) => {
         try {
             const data = JSON.parse(event.data);
-            if (data.type === "leaderboard_update" || data.type === "progress") {
+            if (data.type === "leaderboard_update" || data.type === "progress" || data.type === "auth_change") {
                 fetchLeaderboard();
                 return;
             }
@@ -197,16 +205,37 @@ async function init() {
     if (timerInterval) clearInterval(timerInterval);
     timerInterval = setInterval(updateCountdown, 1000);
 
-    setInterval(fetchLeaderboard, 4000);
+    // Fast background refresh
+    setInterval(fetchLeaderboard, 2500);
 
+    // Immediate cookie check for cross-tab login/logout
+    setInterval(() => {
+        if (currentTeam && !hasSessionCookie()) {
+            currentTeam = null;
+            renderLeaderboard(cachedLeaderboardData);
+            fetchLeaderboard();
+        }
+    }, 500);
+
+    // Instant cross-tab notification via BroadcastChannel
     try {
         const bc = new BroadcastChannel("ctf_progress");
-        bc.onmessage = () => {
+        bc.onmessage = (event) => {
+            if (event.data && event.data.type === "auth_change") {
+                if (!event.data.loggedIn) {
+                    currentTeam = null;
+                    renderLeaderboard(cachedLeaderboardData);
+                } else if (event.data.teamName) {
+                    currentTeam = event.data.teamName;
+                    renderLeaderboard(cachedLeaderboardData);
+                }
+            }
             fetchLeaderboard();
         };
     } catch {}
 
     window.addEventListener("focus", fetchLeaderboard);
+    window.addEventListener("pageshow", fetchLeaderboard);
     document.addEventListener("visibilitychange", () => {
         if (!document.hidden) fetchLeaderboard();
     });

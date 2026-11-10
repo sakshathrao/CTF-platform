@@ -3,7 +3,7 @@
 
 <head>
   <title>Challenge 3</title>
-  <link rel="stylesheet" crossorigin href="/assets/main-g3urCRJu.css">
+  <link rel="stylesheet" crossorigin href="/assets/main-DuwiPGc2.css">
 </head>
 
 <body>
@@ -99,6 +99,11 @@
         if (logoutBtn) {
           logoutBtn.onclick = async () => {
             logoutBtn.disabled = true;
+            try {
+              const bc = new BroadcastChannel("ctf_progress");
+              bc.postMessage({ type: "auth_change", loggedIn: false });
+              bc.close();
+            } catch {}
             try {
               await fetch(`${apiBase}/logout`, {
                 method: "POST",
@@ -944,6 +949,24 @@
     }
 
 
+    let stateTimerInterval = null;
+
+    function setupStateTimer(timerEnd) {
+      if (stateTimerInterval) {
+        clearInterval(stateTimerInterval);
+        stateTimerInterval = null;
+      }
+      if (timerEnd && typeof timerEnd === "number") {
+        stateTimerInterval = setInterval(() => {
+          if (Date.now() >= timerEnd && eventStarted) {
+            clearInterval(stateTimerInterval);
+            stateTimerInterval = null;
+            render({ layout: "end" });
+          }
+        }, 500);
+      }
+    }
+
     // ========================================================
     // EVENT STATE
     // ========================================================
@@ -951,6 +974,9 @@
     function render(
       state
     ) {
+      if (state && state.timerEnd !== undefined) {
+        setupStateTimer(state.timerEnd);
+      }
 
       if (
         state.layout ===
@@ -1158,6 +1184,10 @@
         try {
           const bc = new BroadcastChannel("ctf_progress");
           bc.onmessage = (event) => {
+            if (event.data && event.data.type === "auth_change" && !event.data.loggedIn) {
+              window.location.replace("/login.html");
+              return;
+            }
             if (event.data && typeof event.data.points === "number") {
               const pointsEl = document.getElementById("navPoints");
               if (pointsEl) pointsEl.textContent = event.data.points;

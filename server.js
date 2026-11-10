@@ -222,6 +222,27 @@ function parseDuration(input) {
 
 // Map of teamName -> active WebSocket tunnel
 const activeTunnels = new Map();
+const activeSSHClients = new Set();
+
+function makeSSHDisconnectPacket(reason) {
+    const reasonBuf = Buffer.from(reason, "utf8");
+    const payloadLen = 1 + 4 + 4 + reasonBuf.length + 4;
+    const unpadded = 5 + payloadLen;
+    let padLen = 8 - (unpadded % 8);
+    if (padLen < 4) padLen += 8;
+    const packetLen = 1 + payloadLen + padLen;
+
+    const buf = Buffer.alloc(4 + packetLen);
+    let offset = 0;
+    buf.writeUInt32BE(packetLen, offset); offset += 4;
+    buf.writeUInt8(padLen, offset); offset += 1;
+    buf.writeUInt8(1, offset); offset += 1; // SSH_MSG_DISCONNECT
+    buf.writeUInt32BE(11, offset); offset += 4; // SSH_DISCONNECT_BY_APPLICATION
+    buf.writeUInt32BE(reasonBuf.length, offset); offset += 4;
+    reasonBuf.copy(buf, offset); offset += reasonBuf.length;
+    buf.writeUInt32BE(0, offset);
+    return buf;
+}
 
 function closeAllVMTunnels(reason = "Event ended") {
     for (const [teamName, ws] of activeTunnels.entries()) {
@@ -230,6 +251,31 @@ function closeAllVMTunnels(reason = "Event ended") {
         } catch {}
     }
     activeTunnels.clear();
+
+    for (const clientSocket of activeSSHClients) {
+        try {
+            clientSocket.write("SSH-2.0-CTF_Platform\r\n");
+            clientSocket.write(makeSSHDisconnectPacket(reason));
+            clientSocket.destroy();
+        } catch {}
+    }
+    activeSSHClients.clear();
+}
+
+function getAuthoritativeState() {
+    if (state.timerEnd && Date.now() >= state.timerEnd && state.layout === "start") {
+        state.layout = "end";
+        state.timerEnd = null;
+        closeAllVMTunnels("Event ended");
+        console.log("Timer expired: Event automatically ended.");
+        const broadcastMsg = JSON.stringify(state);
+        for (const client of wss.clients) {
+            if (client.readyState === WebSocket.OPEN) {
+                client.send(broadcastMsg);
+            }
+        }
+    }
+    return state;
 }
 
 function setEventTimer(durationMs) {
@@ -249,18 +295,7 @@ function setEventTimer(durationMs) {
     console.log(`Event timer set for ${durationMs}ms (ends at ${new Date(state.timerEnd).toISOString()})`);
 
     timerTimeout = setTimeout(() => {
-        if (state.layout === "start") {
-            state.layout = "end";
-            state.timerEnd = null;
-            closeAllVMTunnels("Event ended");
-            console.log("Timer expired: Event automatically ended.");
-            const broadcastMsg = JSON.stringify(state);
-            for (const client of wss.clients) {
-                if (client.readyState === WebSocket.OPEN) {
-                    client.send(broadcastMsg);
-                }
-            }
-        }
+        getAuthoritativeState();
     }, durationMs);
 }
 
@@ -986,6 +1021,15 @@ const server =
 
                     db.exec("COMMIT");
 
+                    const lbBroadcast = JSON.stringify({
+                        type: "leaderboard_update"
+                    });
+                    for (const client of wss.clients) {
+                        if (client.readyState === WebSocket.OPEN) {
+                            client.send(lbBroadcast);
+                        }
+                    }
+
 
                     res.writeHead(
                         201,
@@ -1192,6 +1236,15 @@ const server =
                         UPDATE teams SET has_logged_in = 1 WHERE name = ?
                     `).run(teamName);
 
+                    const lbBroadcast = JSON.stringify({
+                        type: "leaderboard_update"
+                    });
+                    for (const client of wss.clients) {
+                        if (client.readyState === WebSocket.OPEN) {
+                            client.send(lbBroadcast);
+                        }
+                    }
+
 
                     res.writeHead(
                         200,
@@ -1350,6 +1403,15 @@ const server =
                     })
                 );
 
+                const lbBroadcast = JSON.stringify({
+                    type: "leaderboard_update"
+                });
+                for (const client of wss.clients) {
+                    if (client.readyState === WebSocket.OPEN) {
+                        client.send(lbBroadcast);
+                    }
+                }
+
                 return;
             }
 
@@ -1427,7 +1489,7 @@ const server =
                 sendJSON(
                     res,
                     200,
-                    state
+                    getAuthoritativeState()
                 );
 
                 return;
@@ -1474,23 +1536,8 @@ const server =
 
                 // Don't allow submissions while
                 // the event isn't running or timer has expired.
-
-                if (
-                    state.layout !== "start" ||
-                    (state.timerEnd && Date.now() >= state.timerEnd)
-                ) {
-                    if (state.timerEnd && Date.now() >= state.timerEnd && state.layout === "start") {
-                        state.layout = "end";
-                        state.timerEnd = null;
-                        closeAllVMTunnels("Event ended");
-                        const broadcastMsg = JSON.stringify(state);
-                        for (const client of wss.clients) {
-                            if (client.readyState === WebSocket.OPEN) {
-                                client.send(broadcastMsg);
-                            }
-                        }
-                    }
-
+                const curState = getAuthoritativeState();
+                if (curState.layout !== "start") {
                     sendJSON(
                         res,
                         403,
@@ -2074,11 +2121,12 @@ const server =
                     members: [row.member1_name, row.member2_name, row.member3_name].filter(Boolean)
                 }));
 
+                const curState = getAuthoritativeState();
                 sendJSON(res, 200, {
                     leaderboard,
                     currentTeam,
-                    timerEnd: state.timerEnd,
-                    layout: state.layout
+                    timerEnd: curState.timerEnd,
+                    layout: curState.layout
                 });
 
                 return;
@@ -2353,7 +2401,8 @@ server.on("upgrade", (request, socket, head) => {
         }
 
         // Reject VM tunnel access if event is not live or timer has expired
-        if (state.layout !== "start" || (state.timerEnd && Date.now() >= state.timerEnd)) {
+        const curState = getAuthoritativeState();
+        if (curState.layout !== "start") {
             socket.write("HTTP/1.1 403 Forbidden\r\n\r\n");
             socket.destroy();
             return;
@@ -2418,7 +2467,7 @@ wss.on(
         // Everyone receives current event state on connect
         socket.send(
             JSON.stringify(
-                state
+                getAuthoritativeState()
             )
         );
 
@@ -2536,36 +2585,19 @@ const PORT = Number(process.env.PORT) || 3001;
 const SSH_PORT = Number(process.env.SSH_PORT) || 2222;
 const SSH_HOST = process.env.SSH_HOST || (HOST === "0.0.0.0" ? "0.0.0.0" : "127.0.0.1");
 
-function makeSSHDisconnectPacket(reason) {
-    const reasonBuf = Buffer.from(reason, "utf8");
-    const payloadLen = 1 + 4 + 4 + reasonBuf.length + 4;
-    const unpadded = 5 + payloadLen;
-    let padLen = 8 - (unpadded % 8);
-    if (padLen < 4) padLen += 8;
-    const packetLen = 1 + payloadLen + padLen;
-
-    const buf = Buffer.alloc(4 + packetLen);
-    let offset = 0;
-    buf.writeUInt32BE(packetLen, offset); offset += 4;
-    buf.writeUInt8(padLen, offset); offset += 1;
-    buf.writeUInt8(1, offset); offset += 1; // SSH_MSG_DISCONNECT
-    buf.writeUInt32BE(11, offset); offset += 4; // SSH_DISCONNECT_BY_APPLICATION
-    buf.writeUInt32BE(reasonBuf.length, offset); offset += 4;
-    reasonBuf.copy(buf, offset); offset += reasonBuf.length;
-    buf.writeUInt32BE(0, offset);
-    return buf;
-}
-
 const sshServer = net.createServer((clientSocket) => {
     console.log(`SSH TCP client connected from ${clientSocket.remoteAddress}:${clientSocket.remotePort}`);
 
-    if (state.layout !== "start" || (state.timerEnd && Date.now() >= state.timerEnd)) {
+    const curState = getAuthoritativeState();
+    if (curState.layout !== "start") {
         console.warn("SSH client connected but CTF event is not running");
         clientSocket.write("SSH-2.0-CTF_Platform\r\n");
         clientSocket.write(makeSSHDisconnectPacket("CTF event is not running."));
         clientSocket.end();
         return;
     }
+
+    activeSSHClients.add(clientSocket);
 
     // Find active VM tunnel (in single-team mode, find any active tunnel)
     let targetWs = null;
@@ -2604,6 +2636,7 @@ const sshServer = net.createServer((clientSocket) => {
     targetWs.on("message", onWsMessage);
 
     const cleanup = () => {
+        activeSSHClients.delete(clientSocket);
         targetWs.off("message", onWsMessage);
         clientSocket.destroy();
     };

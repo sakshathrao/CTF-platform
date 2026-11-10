@@ -689,6 +689,42 @@ select:focus-visible {
   h1small {
     font-size: 50px;
   }
+
+  .leaderboardContainer {
+    min-width: 92vw;
+    max-width: 92vw;
+    padding: 16px 12px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .topRightTimer {
+    top: 20px;
+    right: 20px;
+    gap: 6px;
+  }
+
+  .timerLabel {
+    font-size: 11px;
+  }
+
+  .timerDigits {
+    font-size: 20px;
+  }
+
+  .leaderboardTable th,
+  .leaderboardTable td {
+    padding: 10px 8px;
+    font-size: 14px;
+  }
+
+  .teamName {
+    font-size: 14px;
+  }
+
+  .teamMembers {
+    font-size: 11px;
+  }
 }
 
 /* Respect user motion preferences */
@@ -767,6 +803,7 @@ select:focus-visible {
   border: 1px solid rgba(255, 255, 255, 0.08);
   padding: 24px 32px;
   box-sizing: border-box;
+  overflow-x: auto;
 }
 
 .leaderboardTable {

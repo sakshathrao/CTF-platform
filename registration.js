@@ -131,6 +131,12 @@ registerButton.addEventListener("click", async (event) => {
             return;
         }
 
+        try {
+            const bc = new BroadcastChannel("ctf_progress");
+            bc.postMessage({ type: "auth_change", loggedIn: true, teamName });
+            bc.close();
+        } catch {}
+
         alert(`Team "${teamName}" registered successfully!`);
         window.location.replace("/main.html");
     } catch (error) {

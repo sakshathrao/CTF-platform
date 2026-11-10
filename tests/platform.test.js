@@ -341,6 +341,32 @@ test("HTTP: /register rejects duplicate USNs or duplicate member names", async (
   assert.equal(resDupUSN13.statusCode, 400);
   assert.equal(JSON.parse(resDupUSN13.body).error, "Member 1 and Member 3 cannot have the same USN.");
 
+  // Test duplicate USN between member 2 and member 3
+  const resDupUSN23 = await makeRequest("POST", "/register", { "Content-Type": "application/json" }, {
+    teamName: "TestTeamDupUSN23",
+    password: "Password123!",
+    members: [
+      { name: "Alice", usn: "1MS21CS001" },
+      { name: "Bob", usn: "1MS21CS002" },
+      { name: "Charlie", usn: "1ms21cs002" }
+    ]
+  });
+  assert.equal(resDupUSN23.statusCode, 400);
+  assert.equal(JSON.parse(resDupUSN23.body).error, "Member 2 and Member 3 cannot have the same USN.");
+
+  // Test duplicate name between member 1 and member 3
+  const resDupName13 = await makeRequest("POST", "/register", { "Content-Type": "application/json" }, {
+    teamName: "TestTeamDupName13",
+    password: "Password123!",
+    members: [
+      { name: "Alice", usn: "1MS21CS001" },
+      { name: "Bob", usn: "1MS21CS002" },
+      { name: "alice", usn: "1MS21CS003" }
+    ]
+  });
+  assert.equal(resDupName13.statusCode, 400);
+  assert.equal(JSON.parse(resDupName13.body).error, "Member 1 and Member 3 cannot have the same name.");
+
   // Test duplicate name between member 2 and member 3
   const resDupName23 = await makeRequest("POST", "/register", { "Content-Type": "application/json" }, {
     teamName: "TestTeamDupName2",
@@ -1044,4 +1070,284 @@ test("Admin & State Constraint: if event duration is non-null, the only state th
   const wsReply = await wsRejectPromise;
   assert.match(wsReply.error, /only state that can be set is 'start'/i, "WebSocket returns error when duration is set with layout='wait'");
   ws.close();
+});
+
+test("Leaderboard: immediately reacts to login and logout events", async () => {
+  const teamAuth = "LBAuthTeam_" + Date.now();
+  const rawPassword = "Password123!";
+
+  // 1. Register team
+  const regRes = await makeRequest("POST", "/register", { "Content-Type": "application/json" }, {
+    teamName: teamAuth,
+    password: rawPassword,
+    members: [{ name: "AuthTester", usn: "1MS21CS001" }]
+  });
+  assert.equal(regRes.statusCode, 201);
+  const cookieHeaders = regRes.headers["set-cookie"] || [];
+  const sessionCookie = (Array.isArray(cookieHeaders) ? cookieHeaders : [cookieHeaders])
+    .find(c => c.startsWith("session="));
+  assert.ok(sessionCookie, "Session cookie received on registration");
+  const sessionTokenVal = sessionCookie.split(";")[0];
+
+  try {
+    // 2. Connect a WebSocket client to monitor real-time leaderboard broadcast updates
+    const ws = new WebSocket("ws://127.0.0.1:3099");
+    await new Promise(resolve => ws.once("open", resolve));
+
+    const receivedWsMessages = [];
+    ws.on("message", data => {
+      try {
+        receivedWsMessages.push(JSON.parse(data.toString()));
+      } catch {}
+    });
+
+    // 3. Authenticated request to /api/leaderboard identifies team as currentTeam and isCurrentTeam=true
+    const resAuthLB = await makeRequest("GET", "/api/leaderboard", {
+      Cookie: sessionTokenVal
+    });
+    assert.equal(resAuthLB.statusCode, 200);
+    const authLBData = JSON.parse(resAuthLB.body);
+    assert.equal(authLBData.currentTeam, teamAuth, "Current team is identified when authenticated");
+    const myRow = authLBData.leaderboard.find(t => t.name === teamAuth);
+    assert.ok(myRow, "Team is present in leaderboard");
+    assert.equal(myRow.isCurrentTeam, true, "isCurrentTeam is true when authenticated");
+
+    // 4. Logout from another tab/endpoint
+    receivedWsMessages.length = 0; // reset
+    const resLogout = await makeRequest("POST", "/logout", {
+      Cookie: sessionTokenVal
+    });
+    assert.equal(resLogout.statusCode, 200);
+
+    // Wait for WebSocket leaderboard update notification to be dispatched
+    await new Promise(resolve => setTimeout(resolve, 80));
+    const lbUpdateMsg = receivedWsMessages.find(m => m.type === "leaderboard_update");
+    assert.ok(lbUpdateMsg, "WebSocket dispatched leaderboard_update upon logout");
+
+    // 5. Subsequent request to /api/leaderboard without session cookie returns currentTeam: null
+    const resUnauthLB = await makeRequest("GET", "/api/leaderboard");
+    assert.equal(resUnauthLB.statusCode, 200);
+    const unauthLBData = JSON.parse(resUnauthLB.body);
+    assert.equal(unauthLBData.currentTeam, null, "currentTeam is null when logged out");
+    const unauthRow = unauthLBData.leaderboard.find(t => t.name === teamAuth);
+    assert.ok(unauthRow, "Team is still listed on leaderboard");
+    assert.equal(unauthRow.isCurrentTeam, false, "isCurrentTeam is strictly false when logged out");
+
+    // 6. Login again and verify leaderboard_update is dispatched
+    receivedWsMessages.length = 0; // reset
+    const resLogin = await makeRequest("POST", "/login", { "Content-Type": "application/json" }, {
+      teamName: teamAuth,
+      password: rawPassword
+    });
+    assert.equal(resLogin.statusCode, 200);
+
+    await new Promise(resolve => setTimeout(resolve, 80));
+    const loginUpdateMsg = receivedWsMessages.find(m => m.type === "leaderboard_update");
+    assert.ok(loginUpdateMsg, "WebSocket dispatched leaderboard_update upon login");
+
+    ws.close();
+  } finally {
+    db.prepare("DELETE FROM sessions WHERE team_name = ?").run(teamAuth);
+    db.prepare("DELETE FROM teams WHERE name = ?").run(teamAuth);
+  }
+});
+
+test("Event Stopping & SSH: active SSH connection is immediately severed when event state changes to wait or end", async () => {
+  await makeRequest("POST", "/admin/state", {
+    "Content-Type": "application/json",
+    "X-Admin-Token": TEST_ADMIN_TOKEN
+  }, { layout: "start" });
+
+  const sshTeam = "SshSeverTeam_" + Date.now();
+  const sshToken = "ssh_token_" + Date.now();
+
+  try {
+    db.prepare("INSERT INTO teams (name, password_hash, points, member1_name, member1_usn) VALUES (?, 'h', 0, 'SshUser', '1MS21CS001')").run(sshTeam);
+    db.prepare("INSERT INTO sessions (token, team_name) VALUES (?, ?)").run(sshToken, sshTeam);
+
+    const ws = new WebSocket("ws://127.0.0.1:3099/vm-tunnel", {
+      headers: { Cookie: `session=${sshToken}` }
+    });
+    await new Promise((resolve, reject) => {
+      ws.once("open", resolve);
+      ws.once("error", reject);
+    });
+
+    // Connect SSH client
+    const tcpClient = net.createConnection({ host: "127.0.0.1", port: 2299 });
+    await new Promise((resolve, reject) => {
+      tcpClient.once("connect", resolve);
+      tcpClient.once("error", reject);
+    });
+
+    const disconnectPromise = new Promise(resolve => {
+      let chunks = Buffer.alloc(0);
+      tcpClient.on("data", chunk => { chunks = Buffer.concat([chunks, chunk]); });
+      tcpClient.on("close", () => resolve(chunks));
+    });
+
+    // Change layout to 'end' via admin
+    await makeRequest("POST", "/admin/state", {
+      "Content-Type": "application/json",
+      "X-Admin-Token": TEST_ADMIN_TOKEN
+    }, { layout: "end" });
+
+    // The active SSH connection must receive disconnect packet and close
+    const receivedData = await disconnectPromise;
+    assert.match(receivedData.toString("utf8"), /SSH_Platform|Event stopped/, "Active SSH socket receives disconnect and closes");
+    assert.equal(tcpClient.destroyed, true, "SSH socket is destroyed on event end");
+
+    ws.close();
+  } finally {
+    db.prepare("DELETE FROM sessions WHERE team_name = ?").run(sshTeam);
+    db.prepare("DELETE FROM teams WHERE name = ?").run(sshTeam);
+    await makeRequest("POST", "/admin/state", {
+      "Content-Type": "application/json",
+      "X-Admin-Token": TEST_ADMIN_TOKEN
+    }, { layout: "wait" });
+  }
+});
+
+test("State & Timer: GET /state immediately returns 'end' when timerEnd is in the past without waiting for setTimeout", async () => {
+  state.layout = "start";
+  state.timerEnd = Date.now() - 500; // Past
+
+  const res = await makeRequest("GET", "/state");
+  assert.equal(res.statusCode, 200);
+  const data = JSON.parse(res.body);
+  assert.equal(data.layout, "end", "Authoritative state auto-transitions to 'end'");
+  assert.equal(data.timerEnd, null, "Authoritative timerEnd is cleared");
+
+  // Reset to wait
+  state.layout = "wait";
+});
+
+test("Sync & Points: consecutive solves across categories keep navbar, DB, /session, /progress, and leaderboard 100% in sync", async () => {
+  await makeRequest("POST", "/admin/state", {
+    "Content-Type": "application/json",
+    "X-Admin-Token": TEST_ADMIN_TOKEN
+  }, { layout: "start" });
+
+  const multiTeam = "MultiSyncTeam_" + Date.now();
+  const multiToken = "multi_token_" + Date.now();
+
+  try {
+    db.prepare("INSERT INTO teams (name, password_hash, points, member1_name, member1_usn, has_logged_in) VALUES (?, 'h', 0, 'MultiUser', '1MS21CS001', 1)").run(multiTeam);
+    db.prepare("INSERT INTO sessions (token, team_name) VALUES (?, ?)").run(multiToken, multiTeam);
+
+    const ch1 = db.prepare("SELECT flag FROM challenges WHERE id = 1").get();
+    const ch3 = db.prepare("SELECT flag FROM challenges WHERE id = 3").get();
+    const ch2 = db.prepare("SELECT flag FROM challenges WHERE id = 2").get();
+
+    // Solve 1: Challenge 1 (Web)
+    const res1 = await makeRequest("POST", "/solve", {
+      "Content-Type": "application/json",
+      Cookie: `session=${multiToken}`
+    }, { challengeId: 1, flag: ch1.flag });
+    assert.equal(res1.statusCode, 200);
+    const pts1 = JSON.parse(res1.body).totalPoints;
+
+    // Verify all endpoints match pts1
+    const s1 = JSON.parse((await makeRequest("GET", "/session", { Cookie: `session=${multiToken}` })).body).points;
+    const p1 = JSON.parse((await makeRequest("GET", "/progress", { Cookie: `session=${multiToken}` })).body).points;
+    const db1 = db.prepare("SELECT points FROM teams WHERE name = ?").get(multiTeam).points;
+    const lb1 = JSON.parse((await makeRequest("GET", "/api/leaderboard", { Cookie: `session=${multiToken}` })).body)
+      .leaderboard.find(t => t.name === multiTeam).points;
+
+    assert.equal(s1, pts1, "Solve 1: /session in sync");
+    assert.equal(p1, pts1, "Solve 1: /progress in sync");
+    assert.equal(db1, pts1, "Solve 1: DB in sync");
+    assert.equal(lb1, pts1, "Solve 1: Leaderboard in sync");
+
+    // Solve 2: Challenge 3 (Crypto)
+    const res2 = await makeRequest("POST", "/solve", {
+      "Content-Type": "application/json",
+      Cookie: `session=${multiToken}`
+    }, { challengeId: 3, flag: ch3.flag });
+    assert.equal(res2.statusCode, 200);
+    const pts2 = JSON.parse(res2.body).totalPoints;
+    assert.ok(pts2 > pts1, "Points increased on solve 2");
+
+    const s2 = JSON.parse((await makeRequest("GET", "/session", { Cookie: `session=${multiToken}` })).body).points;
+    const p2 = JSON.parse((await makeRequest("GET", "/progress", { Cookie: `session=${multiToken}` })).body).points;
+    const db2 = db.prepare("SELECT points FROM teams WHERE name = ?").get(multiTeam).points;
+    const lb2 = JSON.parse((await makeRequest("GET", "/api/leaderboard", { Cookie: `session=${multiToken}` })).body)
+      .leaderboard.find(t => t.name === multiTeam).points;
+
+    assert.equal(s2, pts2, "Solve 2: /session in sync");
+    assert.equal(p2, pts2, "Solve 2: /progress in sync");
+    assert.equal(db2, pts2, "Solve 2: DB in sync");
+    assert.equal(lb2, pts2, "Solve 2: Leaderboard in sync");
+
+    // Solve 3: Challenge 2 (Web unlocked)
+    const res3 = await makeRequest("POST", "/solve", {
+      "Content-Type": "application/json",
+      Cookie: `session=${multiToken}`
+    }, { challengeId: 2, flag: ch2.flag });
+    assert.equal(res3.statusCode, 200);
+    const pts3 = JSON.parse(res3.body).totalPoints;
+    assert.ok(pts3 > pts2, "Points increased on solve 3");
+
+    const s3 = JSON.parse((await makeRequest("GET", "/session", { Cookie: `session=${multiToken}` })).body).points;
+    const p3 = JSON.parse((await makeRequest("GET", "/progress", { Cookie: `session=${multiToken}` })).body).points;
+    const db3 = db.prepare("SELECT points FROM teams WHERE name = ?").get(multiTeam).points;
+    const lb3 = JSON.parse((await makeRequest("GET", "/api/leaderboard", { Cookie: `session=${multiToken}` })).body)
+      .leaderboard.find(t => t.name === multiTeam).points;
+
+    assert.equal(s3, pts3, "Solve 3: /session in sync");
+    assert.equal(p3, pts3, "Solve 3: /progress in sync");
+    assert.equal(db3, pts3, "Solve 3: DB in sync");
+    assert.equal(lb3, pts3, "Solve 3: Leaderboard in sync");
+  } finally {
+    db.prepare("DELETE FROM solves WHERE team_name = ?").run(multiTeam);
+    db.prepare("DELETE FROM sessions WHERE team_name = ?").run(multiTeam);
+    db.prepare("DELETE FROM teams WHERE name = ?").run(multiTeam);
+    await makeRequest("POST", "/admin/state", {
+      "Content-Type": "application/json",
+      "X-Admin-Token": TEST_ADMIN_TOKEN
+    }, { layout: "wait" });
+  }
+});
+
+test("Validation: malformed, invalid or non-existent challenge submissions are safely rejected", async () => {
+  await makeRequest("POST", "/admin/state", {
+    "Content-Type": "application/json",
+    "X-Admin-Token": TEST_ADMIN_TOKEN
+  }, { layout: "start" });
+
+  const valTeam = "ValTeam_" + Date.now();
+  const valToken = "val_token_" + Date.now();
+
+  try {
+    db.prepare("INSERT INTO teams (name, password_hash, points, member1_name, member1_usn) VALUES (?, 'h', 0, 'ValUser', '1MS21CS001')").run(valTeam);
+    db.prepare("INSERT INTO sessions (token, team_name) VALUES (?, ?)").run(valToken, valTeam);
+
+    // Non-existent challenge ID 9999
+    const res404 = await makeRequest("POST", "/solve", {
+      "Content-Type": "application/json",
+      Cookie: `session=${valToken}`
+    }, { challengeId: 9999, flag: "some_flag" });
+    assert.equal(res404.statusCode, 404, "Unknown challenge returns 404");
+
+    // Non-integer challenge ID
+    const resStringId = await makeRequest("POST", "/solve", {
+      "Content-Type": "application/json",
+      Cookie: `session=${valToken}`
+    }, { challengeId: "not_a_number", flag: "some_flag" });
+    assert.equal(resStringId.statusCode, 400, "String challengeId returns 400");
+
+    // Missing flag
+    const resNoFlag = await makeRequest("POST", "/solve", {
+      "Content-Type": "application/json",
+      Cookie: `session=${valToken}`
+    }, { challengeId: 1, flag: "" });
+    assert.equal(resNoFlag.statusCode, 400, "Empty flag returns 400");
+  } finally {
+    db.prepare("DELETE FROM sessions WHERE team_name = ?").run(valTeam);
+    db.prepare("DELETE FROM teams WHERE name = ?").run(valTeam);
+    await makeRequest("POST", "/admin/state", {
+      "Content-Type": "application/json",
+      "X-Admin-Token": TEST_ADMIN_TOKEN
+    }, { layout: "wait" });
+  }
 });

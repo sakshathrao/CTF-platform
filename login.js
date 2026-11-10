@@ -39,6 +39,12 @@ loginButton.addEventListener("click", async () => {
             return;
         }
 
+        try {
+            const bc = new BroadcastChannel("ctf_progress");
+            bc.postMessage({ type: "auth_change", loggedIn: true, teamName });
+            bc.close();
+        } catch {}
+
         window.location.replace("/main.html");
     } catch (error) {
         console.error(error);

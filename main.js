@@ -8,6 +8,23 @@ const wsHost = isDev ? `${location.hostname}:3001` : location.host;
 let socket = null;
 let currentLayout = null;
 let solvedChallengeIds = getSolvedChallengeIdsFromCookie();
+let timerCheckInterval = null;
+
+function setupStateTimer(timerEnd) {
+    if (timerCheckInterval) {
+        clearInterval(timerCheckInterval);
+        timerCheckInterval = null;
+    }
+    if (timerEnd && typeof timerEnd === "number") {
+        timerCheckInterval = setInterval(() => {
+            if (Date.now() >= timerEnd && currentLayout === "start") {
+                clearInterval(timerCheckInterval);
+                timerCheckInterval = null;
+                render({ layout: "end" });
+            }
+        }, 500);
+    }
+}
 
 function getSolvedChallengeIdsFromCookie() {
     for (const cookie of document.cookie.split(";")) {
@@ -89,6 +106,11 @@ function setupLogout() {
         logoutBtn.addEventListener("click", async () => {
             logoutBtn.disabled = true;
             try {
+                const bc = new BroadcastChannel("ctf_progress");
+                bc.postMessage({ type: "auth_change", loggedIn: false });
+                bc.close();
+            } catch {}
+            try {
                 await fetch(`${apiBase}/logout`, {
                     method: "POST",
                     credentials: "include"
@@ -136,6 +158,7 @@ function connectWebSocket() {
                 return;
             }
             if (state && typeof state.layout === "string") {
+                setupStateTimer(state.timerEnd);
                 render(state);
             }
         } catch (err) {
@@ -258,6 +281,14 @@ async function start() {
     try {
         const bc = new BroadcastChannel("ctf_progress");
         bc.onmessage = (event) => {
+            if (event.data && event.data.type === "auth_change") {
+                if (!event.data.loggedIn) {
+                    window.location.replace("/login.html");
+                    return;
+                }
+                checkSession();
+                refreshProgress();
+            }
             if (event.data && typeof event.data.points === "number") {
                 const pointsEl = document.getElementById("navPoints");
                 if (pointsEl) pointsEl.textContent = event.data.points;

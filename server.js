@@ -100,7 +100,8 @@ CREATE TABLE IF NOT EXISTS teams (
 CREATE TABLE IF NOT EXISTS challenges (
     id INTEGER PRIMARY KEY,
     solve_count INTEGER NOT NULL DEFAULT 0,
-    flag TEXT
+    flag TEXT,
+    category TEXT
 );
 
 CREATE TABLE IF NOT EXISTS solves (
@@ -118,17 +119,29 @@ CREATE TABLE IF NOT EXISTS sessions (
 );
 `);
 
+try {
+    db.exec("ALTER TABLE challenges ADD COLUMN category TEXT;");
+} catch {}
+
 // Seed any challenges from challenges.js missing from the database
 try {
     const existingChallenges = new Set(
         db.prepare("SELECT id FROM challenges").all().map(c => c.id)
     );
     const insertChallenge = db.prepare(
-        "INSERT INTO challenges (id, flag, solve_count) VALUES (?, ?, 0)"
+        "INSERT INTO challenges (id, flag, solve_count, category) VALUES (?, ?, 0, ?)"
+    );
+    const updateCategory = db.prepare(
+        "UPDATE challenges SET category = ? WHERE id = ?"
     );
     for (const c of challenges) {
         if (!existingChallenges.has(c.id)) {
-            insertChallenge.run(c.id, `flag{challenge_${c.id}_secret}`);
+            insertChallenge.run(c.id, c.flag ?? null, c.category || "General");
+        } else {
+            updateCategory.run(c.category || "General", c.id);
+            if (c.flag) {
+                db.prepare("UPDATE challenges SET flag = ? WHERE id = ?").run(c.flag, c.id);
+            }
         }
     }
 } catch (err) {
@@ -731,24 +744,6 @@ const server =
 
 
                     if (
-                        (name && !usn) ||
-                        (!name && usn)
-                    ) {
-
-                        sendJSON(
-                            res,
-                            400,
-                            {
-                                error:
-                                    `Member ${i + 1} needs both name and USN.`
-                            }
-                        );
-
-                        return;
-                    }
-
-
-                    if (
                         usn &&
                         usn.length !== 10
                     ) {
@@ -788,6 +783,50 @@ const server =
                     );
 
                     return;
+                }
+
+
+                const enteredNames = [];
+                const enteredUSNs = [];
+                for (let i = 0; i < 3; i++) {
+                    const name = memberValues[i * 2];
+                    const usn = memberValues[i * 2 + 1];
+                    if (name) enteredNames.push({ index: i + 1, name });
+                    if (usn) enteredUSNs.push({ index: i + 1, usn });
+                }
+
+                for (let i = 0; i < enteredNames.length; i++) {
+                    for (let j = i + 1; j < enteredNames.length; j++) {
+                        if (enteredNames[i].name.toLowerCase() === enteredNames[j].name.toLowerCase()) {
+                            sendJSON(
+                                res,
+                                400,
+                                {
+                                    error:
+                                        `Member ${enteredNames[i].index} and Member ${enteredNames[j].index} cannot have the same name.`
+                                }
+                            );
+
+                            return;
+                        }
+                    }
+                }
+
+                for (let i = 0; i < enteredUSNs.length; i++) {
+                    for (let j = i + 1; j < enteredUSNs.length; j++) {
+                        if (enteredUSNs[i].usn.toUpperCase() === enteredUSNs[j].usn.toUpperCase()) {
+                            sendJSON(
+                                res,
+                                400,
+                                {
+                                    error:
+                                        `Member ${enteredUSNs[i].index} and Member ${enteredUSNs[j].index} cannot have the same USN.`
+                                }
+                            );
+
+                            return;
+                        }
+                    }
                 }
 
 
@@ -1122,13 +1161,88 @@ const server =
                 }
 
 
+                const team = db.prepare(`
+                    SELECT points
+                    FROM teams
+                    WHERE name = ?
+                `).get(teamName);
+
                 sendJSON(
                     res,
                     200,
                     {
                         loggedIn: true,
-                        teamName
+                        teamName,
+                        points: team?.points ?? 0
                     }
+                );
+
+                return;
+            }
+
+
+            // =================================================
+            // LOGOUT
+            // =================================================
+
+            if (
+                (req.method === "POST" || req.method === "GET") &&
+                req.url === "/logout"
+            ) {
+
+                const sessionID =
+                    getCookie(
+                        req,
+                        "session"
+                    );
+
+                if (sessionID) {
+                    const session =
+                        db.prepare(
+                            "SELECT team_name FROM sessions WHERE token = ?"
+                        ).get(sessionID);
+
+                    if (session?.team_name) {
+                        const tunnel =
+                            activeTunnels.get(
+                                session.team_name
+                            );
+
+                        if (tunnel) {
+                            try {
+                                tunnel.close();
+                            } catch {}
+                            activeTunnels.delete(
+                                session.team_name
+                            );
+                        }
+                    }
+
+                    db.prepare(
+                        "DELETE FROM sessions WHERE token = ?"
+                    ).run(sessionID);
+                }
+
+                res.writeHead(
+                    req.method === "GET" ? 302 : 200,
+                    {
+                        "Content-Type":
+                            "application/json",
+
+                        ...(req.method === "GET" ? { "Location": "/login.html" } : {}),
+
+                        "Set-Cookie": [
+                            makeCookie("session", "") + "; Max-Age=0; HttpOnly",
+                            makeCookie("ctf_progress", "") + "; Max-Age=0"
+                        ]
+                    }
+                );
+
+                res.end(
+                    JSON.stringify({
+                        success: true,
+                        message: "Logged out."
+                    })
                 );
 
                 return;
@@ -1538,6 +1652,7 @@ const server =
 
 
                     let multiplier;
+                    let bonusPercent = 0;
 
 
                     if (
@@ -1545,22 +1660,26 @@ const server =
                     ) {
 
                         multiplier = 1.30;
+                        bonusPercent = 30;
 
                     } else if (
                         solveCount === 1
                     ) {
 
                         multiplier = 1.20;
+                        bonusPercent = 20;
 
                     } else if (
                         solveCount === 2
                     ) {
 
                         multiplier = 1.10;
+                        bonusPercent = 10;
 
                     } else {
 
                         multiplier = 1.00;
+                        bonusPercent = 0;
                     }
 
 
@@ -1647,6 +1766,7 @@ const server =
                     res.end(
                         JSON.stringify({
                             success: true,
+                            bonusPercent,
                             pointsAwarded,
                             totalPoints:
                                 progress.points,
@@ -1654,6 +1774,18 @@ const server =
                                 progress.solved
                         })
                     );
+
+                    // Broadcast real-time score and progress update to any connected sockets for this team
+                    const progressBroadcast = JSON.stringify({
+                        type: "progress",
+                        points: progress.points,
+                        solved: progress.solved
+                    });
+                    for (const client of wss.clients) {
+                        if (client.readyState === WebSocket.OPEN && client.teamName === teamName) {
+                            client.send(progressBroadcast);
+                        }
+                    }
 
 
                     console.log(
@@ -2013,6 +2145,12 @@ wss.on(
             `WebSocket connection from ${remoteAddress}`
         );
 
+        // Bind team name if connected with an authenticated session cookie
+        const teamName = getTeamFromSession(request);
+        if (teamName) {
+            socket.teamName = teamName;
+        }
+
         // Origin check when header is present
         const origin = request.headers.origin;
         if (origin) {
@@ -2071,6 +2209,15 @@ wss.on(
 
                 if (!payload || typeof payload !== "object") {
                     socket.send(JSON.stringify({ error: "Invalid payload format" }));
+                    return;
+                }
+
+                // Client can identify or re-bind session token
+                if (payload.type === "identify") {
+                    const authenticatedTeam = getTeamFromSession(request);
+                    if (authenticatedTeam) {
+                        socket.teamName = authenticatedTeam;
+                    }
                     return;
                 }
 

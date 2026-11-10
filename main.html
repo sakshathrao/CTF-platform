@@ -7,6 +7,22 @@
 </head>
 
 <body>
+  <header id="ctfNavbar" class="navbar" style="display: none;">
+    <div class="navLeft">
+      <span class="navBrand">CTF</span>
+      <span class="navDivider">/</span>
+      <span class="navTeamLabel">TEAM</span>
+      <span class="navTeamName" id="navTeamName"></span>
+    </div>
+    <nav>
+      <div class="navPoints">
+        <span class="pointsLabel">Points:</span>
+        <span class="pointsValue" id="navPoints">0</span>
+      </div>
+      <button type="button" id="logoutBtn" class="navLogoutBtn">Logout</button>
+    </nav>
+  </header>
+
   <div class="main_bg"></div>
 
   <script type="module" src="main.js"></script>

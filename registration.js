@@ -34,22 +34,50 @@ registerButton.addEventListener("click", async (event) => {
         return;
     }
 
-    if ((member2Name && !member2USN) || (!member2Name && member2USN)) {
-        alert("Member 2 needs both name and USN.");
-        return;
-    }
     if (member2USN && member2USN.length !== 10) {
         alert("Member 2 USN must be exactly 10 characters.");
+        inputs[4].focus();
         return;
     }
 
-    if ((member3Name && !member3USN) || (!member3Name && member3USN)) {
-        alert("Member 3 needs both name and USN.");
-        return;
-    }
     if (member3USN && member3USN.length !== 10) {
         alert("Member 3 USN must be exactly 10 characters.");
+        inputs[6].focus();
         return;
+    }
+
+    // Check that entered names are distinct
+    const names = [
+        { index: 1, value: member1Name, input: inputs[1] },
+        { index: 2, value: member2Name, input: inputs[3] },
+        { index: 3, value: member3Name, input: inputs[5] }
+    ].filter(m => m.value);
+
+    for (let i = 0; i < names.length; i++) {
+        for (let j = i + 1; j < names.length; j++) {
+            if (names[i].value.toLowerCase() === names[j].value.toLowerCase()) {
+                alert(`Member ${names[i].index} and Member ${names[j].index} cannot have the same name.`);
+                names[j].input.focus();
+                return;
+            }
+        }
+    }
+
+    // Check that entered USNs are distinct
+    const usns = [
+        { index: 1, value: member1USN, input: inputs[2] },
+        { index: 2, value: member2USN, input: inputs[4] },
+        { index: 3, value: member3USN, input: inputs[6] }
+    ].filter(m => m.value);
+
+    for (let i = 0; i < usns.length; i++) {
+        for (let j = i + 1; j < usns.length; j++) {
+            if (usns[i].value.toUpperCase() === usns[j].value.toUpperCase()) {
+                alert(`Member ${usns[i].index} and Member ${usns[j].index} cannot have the same USN.`);
+                usns[j].input.focus();
+                return;
+            }
+        }
     }
 
     if (!password) {

@@ -1,0 +1,1186 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>Challenge 3</title>
+  <link rel="stylesheet" href="main.css">
+</head>
+
+<body>
+
+  <header id="ctfNavbar" class="navbar" style="display: none;">
+    <div class="navLeft">
+      <a href="/main.html" class="navHomeLink">
+        <span class="navBrand">CTF</span>
+        <span class="navDivider">/</span>
+        <span class="navTeamLabel">TEAM</span>
+        <span class="navTeamName" id="navTeamName"></span>
+      </a>
+    </div>
+    <nav>
+      <a href="/main.html" class="navLink">Challenges</a>
+      <div class="navPoints">
+        <span class="pointsLabel">Points:</span>
+        <span class="pointsValue" id="navPoints">0</span>
+      </div>
+      <button type="button" id="logoutBtn" class="navLogoutBtn">Logout</button>
+    </nav>
+  </header>
+
+  <div class="main_bg" id="app"></div>
+
+
+  <script src="/node_modules/v86/build/libv86.js"></script>
+
+
+  <script>
+
+    "use strict";
+
+
+    const isDev = location.port === "5173" || location.port === "5174";
+    const apiBase = isDev ? `http://${location.hostname}:3001` : "";
+    const wsProtocol = location.protocol === "https:" ? "wss:" : "ws:";
+    const wsHost = isDev ? `${location.hostname}:3001` : location.host;
+
+    const challengeID = 3;
+
+    const app =
+      document.getElementById(
+        "app"
+      );
+
+
+    let eventStarted = false;
+
+    let emulator = null;
+    let tunnelSocket = null;
+
+
+    // ========================================================
+    // SESSION
+    // ========================================================
+
+    async function checkSession() {
+
+      try {
+
+        const response =
+          await fetch(
+            `${apiBase}/session`,
+            {
+              credentials:
+                "include"
+            }
+          );
+
+
+        if (!response.ok) {
+
+          window.location.replace(
+            "/login.html"
+          );
+
+          return false;
+        }
+
+        const data = await response.json();
+        const nav = document.getElementById("ctfNavbar");
+        if (nav) {
+          const teamEl = document.getElementById("navTeamName");
+          const pointsEl = document.getElementById("navPoints");
+          if (teamEl) teamEl.textContent = data.teamName || "";
+          if (pointsEl) pointsEl.textContent = data.points ?? 0;
+          nav.style.display = "flex";
+        }
+
+        const logoutBtn = document.getElementById("logoutBtn");
+        if (logoutBtn) {
+          logoutBtn.onclick = async () => {
+            logoutBtn.disabled = true;
+            try {
+              await fetch(`${apiBase}/logout`, {
+                method: "POST",
+                credentials: "include"
+              });
+            } catch { }
+            document.cookie = "session=; Max-Age=0; path=/;";
+            document.cookie = "ctf_progress=; Max-Age=0; path=/;";
+            window.location.replace("/login.html");
+          };
+        }
+
+        return true;
+
+      } catch {
+
+        alert(
+          "Could not connect to the CTF server."
+        );
+
+
+        window.location.replace(
+          "/login.html"
+        );
+
+        return false;
+      }
+    }
+
+
+    // ========================================================
+    // PROGRESS COOKIE
+    // ========================================================
+
+    function getProgressCookie() {
+
+      for (
+        const cookie
+        of document.cookie.split(";")
+      ) {
+
+        const [
+          key,
+          ...value
+        ] =
+          cookie.trim().split("=");
+
+
+        if (
+          key ===
+          "ctf_progress"
+        ) {
+
+          try {
+
+            return JSON.parse(
+              decodeURIComponent(
+                value.join("=")
+              )
+            );
+
+          } catch {
+
+            return null;
+          }
+        }
+      }
+
+
+      return null;
+    }
+
+
+    function checkAlreadySolved() {
+
+      const progress =
+        getProgressCookie();
+
+
+      return (
+        progress &&
+        Array.isArray(
+          progress.solved
+        ) &&
+        progress.solved.includes(
+          challengeID
+        )
+      );
+    }
+
+
+    // ========================================================
+    // PROGRESS FROM DATABASE
+    // ========================================================
+
+    async function refreshProgress() {
+
+      try {
+
+        const response =
+          await fetch(
+            `${apiBase}/progress`,
+            {
+              credentials:
+                "include"
+            }
+          );
+
+
+        if (!response.ok) {
+          return;
+        }
+
+
+        const progress =
+          await response.json();
+
+        const pointsEl = document.getElementById("navPoints");
+        if (pointsEl && typeof progress.points === "number") {
+          pointsEl.textContent = progress.points;
+        }
+
+
+        if (
+          Array.isArray(
+            progress.solved
+          ) &&
+          progress.solved.includes(
+            challengeID
+          )
+        ) {
+
+          return true;
+        }
+
+
+        return false;
+
+      } catch {
+
+        console.log(
+          "Could not refresh progress."
+        );
+
+        return false;
+      }
+    }
+
+
+    // ========================================================
+    // WAIT / END SCREEN
+    // ========================================================
+
+    function showClosedMessage() {
+
+      app.classList.remove(
+        "start"
+      );
+
+
+      app.replaceChildren();
+
+
+      const title =
+        document.createElement(
+          "h1small"
+        );
+
+
+      title.innerHTML =
+        "This form isn't accepting <br> responses right now.";
+
+
+      app.append(
+        title
+      );
+    }
+
+
+    // ========================================================
+    // CHALLENGE UI
+    // ========================================================
+
+    function showChallenge() {
+
+      app.classList.add(
+        "start"
+      );
+
+
+      app.replaceChildren();
+
+
+      const title =
+        document.createElement(
+          "h1"
+        );
+
+
+      title.textContent =
+        "Challenge 3";
+
+      title.style.paddingLeft = "6%";
+      title.style.paddingTop = "80px";
+
+      const row =
+        document.createElement(
+          "div"
+        );
+
+      row.style.display =
+        "flex";
+
+      row.style.flexDirection =
+        "row";
+
+      row.style.alignItems =
+        "flex-start";
+
+      row.style.justifyContent =
+        "flex-start";
+
+      row.style.flexWrap =
+        "wrap";
+
+      row.style.gap =
+        "36px";
+
+      row.style.paddingLeft = "6%";
+
+      row.style.paddingRight = "6%";
+
+      // ------------------------------------------------------
+      // v86 Terminal Window
+      // ------------------------------------------------------
+
+      const screenContainer =
+        document.createElement(
+          "div"
+        );
+
+      screenContainer.id =
+        "screen_container";
+
+      <!-- screenContainer.style.background = "#0c0d14"; -->
+      <!-- screenContainer.style.border = "1px solid rgba(255, 255, 255, 0.16)"; -->
+      <!-- screenContainer.style.borderRadius = "12px"; -->
+      <!-- screenContainer.style.boxShadow = "0 16px 40px rgba(0, 0, 0, 0.65)"; -->
+      <!-- screenContainer.style.overflow = "hidden"; -->
+      <!-- screenContainer.style.minWidth = "640px"; -->
+      <!-- screenContainer.style.maxWidth = "720px"; -->
+      <!-- screenContainer.style.minHeight = "400px"; -->
+      <!-- screenContainer.style.display = "flex"; -->
+      <!-- screenContainer.style.flexDirection = "column"; -->
+
+      const terminalBar =
+        document.createElement(
+          "div"
+        );
+
+      <!-- terminalBar.style.padding = "8px 14px"; -->
+      <!-- terminalBar.style.background = "rgba(255, 255, 255, 0.05)"; -->
+      <!-- terminalBar.style.borderBottom = "1px solid rgba(255, 255, 255, 0.08)"; -->
+      <!-- terminalBar.style.display = "flex"; -->
+      <!-- terminalBar.style.alignItems = "center"; -->
+      <!-- terminalBar.style.gap = "8px"; -->
+      <!-- terminalBar.style.font = "12px monospace"; -->
+      <!-- terminalBar.style.color = "rgba(255, 255, 255, 0.75)"; -->
+      <!-- terminalBar.innerHTML = "<span style='display:inline-block;width:10px;height:10px;border-radius:50%;background:#ef4444;'></span><span style='display:inline-block;width:10px;height:10px;border-radius:50%;background:#f59e0b;'></span><span style='display:inline-block;width:10px;height:10px;border-radius:50%;background:#10b981;'></span><span style='margin-left:6px;letter-spacing:0.5px;'>v86 Linux Console [i386]</span>"; -->
+
+      const screen =
+        document.createElement(
+          "div"
+        );
+
+      <!-- screen.style.whiteSpace = -->
+      <!-- "pre"; -->
+
+      <!-- screen.style.font = -->
+      <!-- "14px monospace"; -->
+
+      <!-- screen.style.lineHeight = -->
+      <!-- "16px"; -->
+
+      <!-- screen.style.padding = -->
+      <!-- "10px"; -->
+
+      <!-- screen.style.color = -->
+      <!-- "#4ade80"; -->
+
+      <!-- screen.style.flex = -->
+      <!-- "1"; -->
+
+      <!-- screen.style.minHeight = -->
+      <!-- "360px"; -->
+
+      <!-- screen.style.background = -->
+      <!-- "#000000"; -->
+
+      <!-- screen.style.overflow = -->
+      <!-- "auto"; -->
+
+      const canvas =
+        document.createElement(
+          "canvas"
+        );
+
+      canvas.style.display =
+        "none";
+
+      canvas.style.width =
+        "100%";
+
+      canvas.style.height =
+        "auto";
+
+      screenContainer.append(
+        terminalBar,
+        screen,
+        canvas
+      );
+
+      row.append(
+        screenContainer
+      );
+
+
+      // ------------------------------------------------------
+      // Flag box
+      // ------------------------------------------------------
+
+      const dialog =
+        document.createElement(
+          "div"
+        );
+
+
+      dialog.classList.add(
+        "dialogBox"
+      );
+
+
+      dialog.style.display =
+        "flex";
+
+      dialog.style.alignItems =
+        "center";
+
+
+      const label =
+        document.createElement(
+          "div"
+        );
+
+
+      label.textContent =
+        "The key:";
+
+
+      const flagInput =
+        document.createElement(
+          "input"
+        );
+
+
+      flagInput.id =
+        "flag";
+
+
+      flagInput.placeholder =
+        "xxxxx-xxxxx";
+
+
+      const submitButton =
+        document.createElement(
+          "button"
+        );
+
+
+      submitButton.id =
+        "submit";
+
+
+      submitButton.textContent =
+        "Submit";
+
+
+      const result =
+        document.createElement(
+          "div"
+        );
+
+
+      result.id =
+        "result";
+
+
+      const sshInfo =
+        document.createElement(
+          "div"
+        );
+
+      sshInfo.id =
+        "ssh-status";
+
+      sshInfo.style.fontSize =
+        "13px";
+
+      sshInfo.style.marginTop =
+        "12px";
+
+      sshInfo.style.color =
+        "rgba(255, 255, 255, 0.75)";
+
+      sshInfo.innerHTML =
+        "Host SSH: <code style='background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px;'>ssh -p 2222 root@127.0.0.1</code>";
+
+      dialog.append(
+        label,
+        flagInput,
+        submitButton,
+        result,
+        sshInfo
+      );
+
+
+      row.append(
+        dialog
+      );
+
+
+      app.append(
+        title,
+        row
+      );
+
+
+      // ------------------------------------------------------
+      // Already solved?
+      // ------------------------------------------------------
+
+      if (
+        checkAlreadySolved()
+      ) {
+
+        flagInput.disabled =
+          true;
+
+        submitButton.disabled =
+          true;
+
+        result.textContent =
+          "Challenge already solved.";
+
+      }
+
+
+      // ------------------------------------------------------
+      // Submit
+      // ------------------------------------------------------
+
+      submitButton.addEventListener(
+        "click",
+        async () => {
+
+          if (
+            !eventStarted
+          ) {
+
+            alert(
+              "This form isn't accepting responses right now."
+            );
+
+            return;
+          }
+
+
+          const flag =
+            flagInput.value.trim();
+
+
+          if (!flag) {
+
+            alert(
+              "Please enter a flag."
+            );
+
+            return;
+          }
+
+
+          submitButton.disabled =
+            true;
+
+
+          result.textContent =
+            "Checking...";
+
+
+          try {
+
+            const response =
+              await fetch(
+                `${apiBase}/solve`,
+                {
+                  method:
+                    "POST",
+
+                  credentials:
+                    "include",
+
+                  headers: {
+                    "Content-Type":
+                      "application/json"
+                  },
+
+                  body:
+                    JSON.stringify({
+                      challengeId:
+                        challengeID,
+
+                      flag
+                    })
+                }
+              );
+
+
+            const data =
+              await response.json();
+
+
+            // ------------------------------------------------
+            // Correct
+            // ------------------------------------------------
+
+            if (
+              response.ok &&
+              data.success
+            ) {
+
+              flagInput.disabled =
+                true;
+
+              submitButton.disabled =
+                true;
+
+              // Immediately update navbar score on the page before alert
+              const pointsEl = document.getElementById("navPoints");
+              if (pointsEl && typeof data.totalPoints === "number") {
+                pointsEl.textContent = data.totalPoints;
+              }
+
+              // Notify all other open tabs immediately via BroadcastChannel
+              try {
+                const bc = new BroadcastChannel("ctf_progress");
+                bc.postMessage({
+                  type: "progress",
+                  points: data.totalPoints,
+                  solved: data.solved
+                });
+                bc.close();
+              } catch {}
+
+
+              if (
+                data.bonusPercent ===
+                30
+              ) {
+
+                alert(
+                  `CORRECT!\n\n` +
+                  `1st solve — +30% bonus!\n` +
+                  `Points awarded: ${data.pointsAwarded}\n` +
+                  `Total points: ${data.totalPoints}`
+                );
+
+              } else if (
+                data.bonusPercent ===
+                20
+              ) {
+
+                alert(
+                  `CORRECT!\n\n` +
+                  `2nd solve — +20% bonus!\n` +
+                  `Points awarded: ${data.pointsAwarded}\n` +
+                  `Total points: ${data.totalPoints}`
+                );
+
+              } else if (
+                data.bonusPercent ===
+                10
+              ) {
+
+                alert(
+                  `CORRECT!\n\n` +
+                  `3rd solve — +10% bonus!\n` +
+                  `Points awarded: ${data.pointsAwarded}\n` +
+                  `Total points: ${data.totalPoints}`
+                );
+
+              } else {
+
+                alert(
+                  `CORRECT!\n\n` +
+                  `Regular points awarded: ${data.pointsAwarded}\n` +
+                  `Total points: ${data.totalPoints}`
+                );
+              }
+
+
+              result.textContent =
+                `Solved! +${data.pointsAwarded} points.`;
+
+              return;
+            }
+
+
+            // ------------------------------------------------
+            // Already solved
+            // ------------------------------------------------
+
+            if (
+              response.status ===
+              409
+            ) {
+
+              flagInput.disabled =
+                true;
+
+              submitButton.disabled =
+                true;
+
+              result.textContent =
+                "Challenge already solved.";
+
+              alert(
+                "Your team has already solved this challenge."
+              );
+
+              return;
+            }
+
+
+            // ------------------------------------------------
+            // Event not accepting responses
+            // ------------------------------------------------
+
+            if (
+              response.status ===
+              403
+            ) {
+
+              flagInput.disabled =
+                true;
+
+              submitButton.disabled =
+                true;
+
+              alert(
+                "This form isn't accepting responses right now."
+              );
+
+              return;
+            }
+
+
+            // ------------------------------------------------
+            // Incorrect flag
+            // ------------------------------------------------
+
+            if (
+              response.status ===
+              400
+            ) {
+
+              alert(
+                "Incorrect flag."
+              );
+
+
+              result.textContent =
+                "Incorrect flag.";
+
+
+              submitButton.disabled =
+                false;
+
+
+              return;
+            }
+
+
+            // ------------------------------------------------
+            // Server failure
+            // ------------------------------------------------
+
+            alert(
+              data.error ||
+              "Something went wrong on the server."
+            );
+
+
+            result.textContent =
+              "Server error.";
+
+
+            submitButton.disabled =
+              false;
+
+
+          } catch (error) {
+
+            console.error(
+              error
+            );
+
+
+            alert(
+              "Error: Could not contact the CTF server."
+            );
+
+
+            result.textContent =
+              "Connection failed.";
+
+
+            submitButton.disabled =
+              false;
+          }
+        }
+      );
+
+
+      // ------------------------------------------------------
+      // Start v86 only when event is live
+      // ------------------------------------------------------
+
+      emulator =
+        window.emulator =
+        new V86({
+          wasm_path: "/node_modules/v86/build/v86.wasm",
+          memory_size: 64 * 1024 * 1024,
+          vga_memory_size: 2 * 1024 * 1024,
+
+          screen_container: document.getElementById("screen_container"),
+
+          bios: {
+            url: "/images/seabios.bin",
+          },
+
+          vga_bios: {
+            url: "/images/vgabios.bin",
+          },
+
+          bzimage: {
+            url: "/images/bzImageSSH",
+          },
+
+          cmdline: "console=tty0 console=ttyS0 quiet",
+
+          uart1: true,
+
+          net_device: {
+            type: "virtio",
+            relay_url: "fetch",
+          },
+
+          autostart: true,
+        });
+
+      // ------------------------------------------------------
+      // In-browser VM SSH byte tunnel
+      // ------------------------------------------------------
+      if (tunnelSocket) {
+        tunnelSocket.close();
+        tunnelSocket = null;
+      }
+
+      function connectVMTunnel() {
+        if (!eventStarted || !emulator) return;
+        tunnelSocket = new WebSocket(`${wsProtocol}//${wsHost}/vm-tunnel`);
+        tunnelSocket.binaryType = "arraybuffer";
+
+        tunnelSocket.addEventListener("open", () => {
+          console.log("In-browser VM SSH tunnel connected to host server");
+          const statusEl = document.getElementById("ssh-status");
+          if (statusEl) {
+            statusEl.innerHTML = "Host SSH: <code style='background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px;'>ssh -p 2222 root@127.0.0.1</code> (Tunnel Active)";
+          }
+        });
+
+        tunnelSocket.addEventListener("message", (event) => {
+          if (emulator && event.data) {
+            const bytes = new Uint8Array(event.data);
+            emulator.serial_send_bytes(1, bytes);
+          }
+        });
+
+        let outBuffer = [];
+        let outTimer = null;
+
+        function flushSerialBuffer() {
+          if (outBuffer.length > 0 && tunnelSocket && tunnelSocket.readyState === WebSocket.OPEN) {
+            tunnelSocket.send(new Uint8Array(outBuffer));
+            outBuffer = [];
+          }
+          outTimer = null;
+        }
+
+        emulator.add_listener("serial1-output-byte", (byte) => {
+          outBuffer.push(byte);
+          if (outBuffer.length >= 256) {
+            flushSerialBuffer();
+          } else if (!outTimer) {
+            outTimer = setTimeout(flushSerialBuffer, 5);
+          }
+        });
+
+        tunnelSocket.addEventListener("close", () => {
+          console.log("VM SSH tunnel closed, reconnecting in 3s...");
+          if (eventStarted && emulator) {
+            setTimeout(connectVMTunnel, 3000);
+          }
+        });
+
+        tunnelSocket.addEventListener("error", (err) => {
+          console.warn("VM tunnel error:", err);
+        });
+      }
+
+      connectVMTunnel();
+
+      // Configure guest loopback, keys, and SSH bridge on boot
+      let vmConfigured = false;
+      emulator.add_listener("emulator-started", () => {
+        if (vmConfigured) return;
+        vmConfigured = true;
+        setTimeout(() => {
+          const initCmd = "ifconfig lo up && mkdir -p /etc/tinyssh && [ ! -f /etc/tinyssh/keydir/ed25519.pk ] && tinysshd-makekey /etc/tinyssh/keydir 2>/dev/null; [ ! -c /dev/ttyS1 ] && mknod /dev/ttyS1 c 4 65 2>/dev/null; socat TCP-LISTEN:22,fork,reuseaddr EXEC:\"/usr/sbin/tinysshd /etc/tinyssh/keydir\" & while true; do socat /dev/ttyS1,raw,echo=0 TCP:127.0.0.1:22; sleep 0.2; done &\n";
+          emulator.serial0_send(initCmd);
+        }, 4000);
+      });
+    }
+
+
+    // ========================================================
+    // EVENT STATE
+    // ========================================================
+
+    function render(
+      state
+    ) {
+
+      if (
+        state.layout ===
+        "start"
+      ) {
+
+        eventStarted =
+          true;
+
+
+        /*
+         * Don't recreate the whole challenge
+         * every time we receive a state message.
+         */
+
+        if (
+          !document.getElementById(
+            "submit"
+          )
+        ) {
+
+          showChallenge();
+        }
+
+
+        return;
+      }
+
+
+      // wait / end
+
+      eventStarted =
+        false;
+
+
+      /*
+       * Stop the VM if the event goes offline.
+       */
+
+      if (
+        emulator &&
+        typeof emulator.stop ===
+        "function"
+      ) {
+
+        emulator.stop();
+
+        emulator =
+          null;
+      }
+
+      if (tunnelSocket) {
+        tunnelSocket.close();
+        tunnelSocket = null;
+      }
+
+
+      showClosedMessage();
+    }
+
+
+    // ========================================================
+    // WEBSOCKET
+    // ========================================================
+
+    function connectEventSocket() {
+
+      const socket =
+        new WebSocket(
+          `${wsProtocol}//${wsHost}`
+        );
+
+
+      socket.addEventListener(
+        "open",
+        () => {
+
+          console.log(
+            "Connected to server"
+          );
+          try {
+            socket.send(JSON.stringify({ type: "identify" }));
+          } catch {}
+        }
+      );
+
+
+      socket.addEventListener(
+        "message",
+        event => {
+
+          try {
+
+            const state =
+              JSON.parse(
+                event.data
+              );
+
+            if (state && state.type === "progress") {
+              const pointsEl = document.getElementById("navPoints");
+              if (pointsEl && typeof state.points === "number") {
+                pointsEl.textContent = state.points;
+              }
+              if (Array.isArray(state.solved) && state.solved.includes(challengeID)) {
+                const flagEl = document.getElementById("flag");
+                const submitEl = document.getElementById("submit");
+                const resultEl = document.getElementById("result");
+                if (flagEl) flagEl.disabled = true;
+                if (submitEl) submitEl.disabled = true;
+                if (resultEl) resultEl.textContent = "Challenge already solved.";
+              }
+              return;
+            }
+
+            render(
+              state
+            );
+
+          } catch (error) {
+
+            console.error(
+              "Invalid event state:",
+              error
+            );
+          }
+        }
+      );
+
+
+      socket.addEventListener(
+        "close",
+        () => {
+
+          eventStarted =
+            false;
+
+
+          if (
+            emulator &&
+            typeof emulator.stop ===
+            "function"
+          ) {
+
+            emulator.stop();
+
+            emulator =
+              null;
+          }
+
+
+          showClosedMessage();
+
+
+          /*
+           * Try reconnecting.
+           */
+
+          setTimeout(
+            connectEventSocket,
+            2000
+          );
+        }
+      );
+
+
+      socket.addEventListener(
+        "error",
+        error => {
+
+          console.error(
+            "WebSocket error:",
+            error
+          );
+        }
+      );
+    }
+
+
+    // ========================================================
+    // START
+    // ========================================================
+
+    window.onload =
+      async function () {
+
+        if (
+          !(await checkSession())
+        ) {
+
+          return;
+        }
+
+
+        await refreshProgress();
+
+
+        /*
+         * WebSocket immediately sends the current
+         * state, exactly like main.js.
+         */
+
+        connectEventSocket();
+
+        // Listen for progress updates from other tabs
+        try {
+          const bc = new BroadcastChannel("ctf_progress");
+          bc.onmessage = (event) => {
+            if (event.data && typeof event.data.points === "number") {
+              const pointsEl = document.getElementById("navPoints");
+              if (pointsEl) pointsEl.textContent = event.data.points;
+            }
+            if (event.data && Array.isArray(event.data.solved) && event.data.solved.includes(challengeID)) {
+              const flagEl = document.getElementById("flag");
+              const submitEl = document.getElementById("submit");
+              const resultEl = document.getElementById("result");
+              if (flagEl) flagEl.disabled = true;
+              if (submitEl) submitEl.disabled = true;
+              if (resultEl) resultEl.textContent = "Challenge already solved.";
+            }
+          };
+        } catch {}
+
+        setInterval(refreshProgress, 4000);
+        window.addEventListener("focus", refreshProgress);
+        document.addEventListener("visibilitychange", () => {
+          if (!document.hidden) refreshProgress();
+        });
+      };
+
+  </script>
+
+</body>
+
+</html>

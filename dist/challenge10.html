@@ -77,6 +77,7 @@ const wsHost = isDev ? `${location.hostname}:3001` : location.host;
 
 let eventStarted = false;
 let solved = false;
+let justSolvedThisTab = false;
 
 function getElements() {
   return {
@@ -109,13 +110,23 @@ async function getJSON(path) {
   return response.json();
 }
 
-function notify({ title, message, type = "info", duration = 6500 }) {
+const activeNotifyKeys = new Set();
+function notify({ title, message, type = "info", duration = 6500, key = null }) {
+  const dedupeKey = key || `${title}:${message}`;
+  if (activeNotifyKeys.has(dedupeKey)) return;
+  activeNotifyKeys.add(dedupeKey);
+  setTimeout(() => activeNotifyKeys.delete(dedupeKey), 8000);
+
   let container = document.getElementById("ctfNotifyContainer");
   if (!container) {
     container = document.createElement("div");
     container.id = "ctfNotifyContainer";
     container.style.cssText = "position: fixed; top: 85px; right: 24px; z-index: 99999; display: flex; flex-direction: column; gap: 12px; max-width: 440px; pointer-events: none;";
     document.body.appendChild(container);
+  } else {
+    while (container.firstChild) {
+      container.removeChild(container.firstChild);
+    }
   }
 
   const toast = document.createElement("div");
@@ -271,8 +282,12 @@ async function submitFlag(event) {
         bc.close();
       } catch {}
 
+      const dedupeKey = `solve_${CHALLENGE_ID}`;
+      justSolvedThisTab = true;
+
       if (hasBonus) {
         notify({
+          key: dedupeKey,
           title: "Marks + Bonus Received! 🎯",
           message: `Your team received marks + bonus: +${awarded} marks (${base} base + ${bonusPts} First Blood bonus [${bonusPct}%])!`,
           type: "bonus"
@@ -280,6 +295,7 @@ async function submitFlag(event) {
         applySolvedState(`CASE CLOSED — +${awarded} MARKS (MARKS + BONUS: ${base} BASE + ${bonusPts} BONUS)`);
       } else {
         notify({
+          key: dedupeKey,
           title: "Marks Received! 🏁",
           message: `Your team received just marks: +${awarded} marks.`,
           type: "success"
@@ -320,20 +336,26 @@ function connectSocket() {
         if (Array.isArray(state.solved) && state.solved.includes(CHALLENGE_ID)) {
           applySolvedState("YOUR TEAM HAS ALREADY SOLVED THIS CASE.");
         }
-        if (typeof state.pointsAwarded === "number" && state.challengeId === CHALLENGE_ID) {
+        if (typeof state.pointsAwarded === "number") {
+          if (justSolvedThisTab && state.challengeId === CHALLENGE_ID) {
+            return;
+          }
           const awarded = state.pointsAwarded;
           const base = state.basePoints || awarded;
           const bonusPct = state.bonusPercent || 0;
           const bonusPts = awarded - base;
           const hasBonus = bonusPct > 0 && bonusPts > 0;
+          const dedupeKey = `solve_${state.challengeId || CHALLENGE_ID}`;
           if (hasBonus) {
             notify({
+              key: dedupeKey,
               title: "Marks + Bonus Received! 🎯",
               message: `Your team received marks + bonus: +${awarded} marks (${base} base + ${bonusPts} First Blood bonus [${bonusPct}%])!`,
               type: "bonus"
             });
           } else {
             notify({
+              key: dedupeKey,
               title: "Marks Received! 🏁",
               message: `Your team received just marks: +${awarded} marks.`,
               type: "success"
@@ -447,20 +469,26 @@ async function init() {
       if (event.data && Array.isArray(event.data.solved) && event.data.solved.includes(CHALLENGE_ID)) {
         applySolvedState("YOUR TEAM HAS ALREADY SOLVED THIS CASE.");
       }
-      if (event.data && typeof event.data.pointsAwarded === "number" && event.data.challengeId === CHALLENGE_ID) {
+      if (event.data && typeof event.data.pointsAwarded === "number") {
+        if (justSolvedThisTab && event.data.challengeId === CHALLENGE_ID) {
+          return;
+        }
         const awarded = event.data.pointsAwarded;
         const base = event.data.basePoints || awarded;
         const bonusPct = event.data.bonusPercent || 0;
         const bonusPts = awarded - base;
         const hasBonus = bonusPct > 0 && bonusPts > 0;
+        const dedupeKey = `solve_${event.data.challengeId || CHALLENGE_ID}`;
         if (hasBonus) {
           notify({
+            key: dedupeKey,
             title: "Marks + Bonus Received! 🎯",
             message: `Your team received marks + bonus: +${awarded} marks (${base} base + ${bonusPts} First Blood bonus [${bonusPct}%])!`,
             type: "bonus"
           });
         } else {
           notify({
+            key: dedupeKey,
             title: "Marks Received! 🏁",
             message: `Your team received just marks: +${awarded} marks.`,
             type: "success"

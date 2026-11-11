@@ -19,7 +19,7 @@ process.env.SSH_PORT = "2299";
 
 import net from "node:net";
 
-const { server, wss, vmTunnelWss, sshServer, db, state, verifyAdminToken } = await import("../server.js");
+const { server, wss, vmTunnelWss, sshServer, db, state, verifyAdminToken, rateLimitMap } = await import("../server.js");
 
 function makeRequest(method, urlPath, headers = {}, body = null) {
   return new Promise((resolve, reject) => {
@@ -1484,6 +1484,452 @@ test("Challenges 001-031: Solves across diverse categories correctly award point
     db.prepare("DELETE FROM solves WHERE team_name = ?").run(catTeam);
     db.prepare("DELETE FROM sessions WHERE team_name = ?").run(catTeam);
     db.prepare("DELETE FROM teams WHERE name = ?").run(catTeam);
+    await makeRequest("POST", "/admin/state", {
+      "Content-Type": "application/json",
+      "X-Admin-Token": TEST_ADMIN_TOKEN
+    }, { layout: "wait" });
+  }
+});
+
+// ============================================================
+// Expanded Tests (Requirements R1, R2, R3)
+// ============================================================
+
+test("Expansion: Full serial solve of all 31 challenges in category order verifies authoritative flags, scoring, and DB records", async () => {
+  const { challenges } = await import("../challenges.js");
+  const origCounts = db.prepare("SELECT id, solve_count FROM challenges").all();
+
+  await makeRequest("POST", "/admin/state", {
+    "Content-Type": "application/json",
+    "X-Admin-Token": TEST_ADMIN_TOKEN
+  }, { layout: "start" });
+
+  const teamName = "SerialAllTeam_" + Date.now();
+  const token = "serial_tok_" + Date.now();
+
+  try {
+    db.prepare("INSERT INTO teams (name, password_hash, points, member1_name, member1_usn, has_logged_in) VALUES (?, 'h', 0, 'SerialUser', '1MS21CS888', 1)").run(teamName);
+    db.prepare("INSERT INTO sessions (token, team_name) VALUES (?, ?)").run(token, teamName);
+
+    const categories = ["OSINT", "Forensics", "Web", "Cryptography", "Reverse Engineering", "Linux", "Steganography", "Multi-stage", "Network Analysis"];
+    const orderedChallenges = [];
+    for (const cat of categories) {
+      orderedChallenges.push(...challenges.filter(c => c.category === cat));
+    }
+    assert.equal(orderedChallenges.length, 31, "All 31 challenges mapped across categories");
+
+    let cumulativePoints = 0;
+    for (const ch of orderedChallenges) {
+      if (rateLimitMap) rateLimitMap.delete("solve:" + teamName);
+      const chRow = db.prepare("SELECT flag FROM challenges WHERE id = ?").get(ch.id);
+      assert.ok(chRow, `Challenge ${ch.id} exists in DB`);
+
+      const res = await makeRequest("POST", "/solve", {
+        "Content-Type": "application/json",
+        Cookie: `session=${token}`
+      }, { challengeId: ch.id, flag: chRow.flag });
+
+      assert.equal(res.statusCode, 200, `Challenge ${ch.id} (${ch.category}) solve returned 200`);
+      const body = JSON.parse(res.body);
+      assert.equal(body.success, true, `Challenge ${ch.id} solve successful`);
+      assert.ok(body.pointsAwarded >= ch.points, `Points awarded (${body.pointsAwarded}) >= base (${ch.points})`);
+      cumulativePoints += body.pointsAwarded;
+      assert.equal(body.totalPoints, cumulativePoints, `totalPoints (${body.totalPoints}) matches cumulative (${cumulativePoints})`);
+      assert.ok(body.solved.includes(ch.id), `Solved array includes challenge ${ch.id}`);
+    }
+
+    const solvesInDb = db.prepare("SELECT challenge_id FROM solves WHERE team_name = ?").all(teamName);
+    assert.equal(solvesInDb.length, 31, "Exactly 31 solves recorded in DB");
+
+    const finalTeam = db.prepare("SELECT points FROM teams WHERE name = ?").get(teamName);
+    assert.equal(finalTeam.points, cumulativePoints, "Team points in DB matches total cumulative points");
+  } finally {
+    db.prepare("DELETE FROM solves WHERE team_name = ?").run(teamName);
+    db.prepare("DELETE FROM sessions WHERE team_name = ?").run(teamName);
+    db.prepare("DELETE FROM teams WHERE name = ?").run(teamName);
+    for (const r of origCounts) {
+      db.prepare("UPDATE challenges SET solve_count = ? WHERE id = ?").run(r.solve_count, r.id);
+    }
+    await makeRequest("POST", "/admin/state", {
+      "Content-Type": "application/json",
+      "X-Admin-Token": TEST_ADMIN_TOKEN
+    }, { layout: "wait" });
+  }
+});
+
+test("Expansion: HTTP asset delivery serves exhibit assets across challenges with status 200 and non-empty content", async () => {
+  const fs = await import("node:fs");
+  const { challenges } = await import("../challenges.js");
+
+  const assetUrls = new Set();
+  for (const c of challenges) {
+    const html = fs.readFileSync(path.join(projectRoot, "public", `challenge${c.id}.html`), "utf8");
+    const matches = [...html.matchAll(/(?:href|src)=["'](\/(?:assets|challenges)[^"']+)["']/g)].map(m => m[1]);
+    for (const u of matches) {
+      const cleanUrl = u.split("#")[0];
+      assetUrls.add(cleanUrl);
+    }
+  }
+
+  assert.ok(assetUrls.size > 50, `Found ${assetUrls.size} unique exhibit assets across challenges`);
+
+  for (const u of assetUrls) {
+    const res = await makeRequest("GET", u);
+    assert.equal(res.statusCode, 200, `Asset ${u} returns HTTP 200`);
+    assert.ok(res.body && res.body.length > 0, `Asset ${u} has non-empty payload`);
+  }
+});
+
+test("Expansion: Clean URL resolution resolves /challenge1 through /challenge31 without .html", async () => {
+  for (let id = 1; id <= 31; id++) {
+    const res = await makeRequest("GET", `/challenge${id}`);
+    assert.equal(res.statusCode, 200, `/challenge${id} returns 200`);
+    assert.match(res.body, new RegExp(`<title>Challenge ${id}</title>`), `/challenge${id} contains Challenge ${id} title`);
+  }
+});
+
+test("Expansion: Dynamic first-blood multipliers award 130% -> 120% -> 110% -> 100% across 4 successive solves", async () => {
+  const testChId = 1;
+  const orig = db.prepare("SELECT solve_count FROM challenges WHERE id = ?").get(testChId);
+
+  await makeRequest("POST", "/admin/state", {
+    "Content-Type": "application/json",
+    "X-Admin-Token": TEST_ADMIN_TOKEN
+  }, { layout: "start" });
+
+  const fbTeams = [
+    { name: `FB_Team_1_${Date.now()}`, token: `fb_tok_1_${Date.now()}`, usn: "1MS21CS051", expectedPct: 30, expectedPts: 130 },
+    { name: `FB_Team_2_${Date.now()}`, token: `fb_tok_2_${Date.now()}`, usn: "1MS21CS052", expectedPct: 20, expectedPts: 120 },
+    { name: `FB_Team_3_${Date.now()}`, token: `fb_tok_3_${Date.now()}`, usn: "1MS21CS053", expectedPct: 10, expectedPts: 110 },
+    { name: `FB_Team_4_${Date.now()}`, token: `fb_tok_4_${Date.now()}`, usn: "1MS21CS054", expectedPct: 0,  expectedPts: 100 }
+  ];
+
+  try {
+    db.prepare("UPDATE challenges SET solve_count = 0 WHERE id = ?").run(testChId);
+    const flag = db.prepare("SELECT flag FROM challenges WHERE id = ?").get(testChId).flag;
+
+    for (const t of fbTeams) {
+      db.prepare("INSERT INTO teams (name, password_hash, points, member1_name, member1_usn, has_logged_in) VALUES (?, 'h', 0, 'FBUser', ?, 1)").run(t.name, t.usn);
+      db.prepare("INSERT INTO sessions (token, team_name) VALUES (?, ?)").run(t.token, t.name);
+
+      const res = await makeRequest("POST", "/solve", {
+        "Content-Type": "application/json",
+        Cookie: `session=${t.token}`
+      }, { challengeId: testChId, flag });
+
+      assert.equal(res.statusCode, 200, `${t.name} solve returns 200`);
+      const body = JSON.parse(res.body);
+      assert.equal(body.bonusPercent, t.expectedPct, `Bonus percent is ${t.expectedPct}%`);
+      assert.equal(body.pointsAwarded, t.expectedPts, `Points awarded is ${t.expectedPts}`);
+    }
+  } finally {
+    for (const t of fbTeams) {
+      db.prepare("DELETE FROM solves WHERE team_name = ?").run(t.name);
+      db.prepare("DELETE FROM sessions WHERE team_name = ?").run(t.name);
+      db.prepare("DELETE FROM teams WHERE name = ?").run(t.name);
+    }
+    db.prepare("UPDATE challenges SET solve_count = ? WHERE id = ?").run(orig.solve_count, testChId);
+    await makeRequest("POST", "/admin/state", {
+      "Content-Type": "application/json",
+      "X-Admin-Token": TEST_ADMIN_TOKEN
+    }, { layout: "wait" });
+  }
+});
+
+test("Expansion: Flag submission rate limiting returns HTTP 429 when rate limit is exceeded", async () => {
+  await makeRequest("POST", "/admin/state", {
+    "Content-Type": "application/json",
+    "X-Admin-Token": TEST_ADMIN_TOKEN
+  }, { layout: "start" });
+
+  const rlTeam = `RLTeam_${Date.now()}`;
+  const rlToken = `rl_tok_${Date.now()}`;
+
+  try {
+    db.prepare("INSERT INTO teams (name, password_hash, points, member1_name, member1_usn, has_logged_in) VALUES (?, 'h', 0, 'RLUser', '1MS21CS060', 1)").run(rlTeam);
+    db.prepare("INSERT INTO sessions (token, team_name) VALUES (?, ?)").run(rlToken, rlTeam);
+
+    let hit429 = false;
+    let errMessage = "";
+    for (let i = 0; i < 14; i++) {
+      const res = await makeRequest("POST", "/solve", {
+        "Content-Type": "application/json",
+        Cookie: `session=${rlToken}`
+      }, { challengeId: 1, flag: "wrong_flag_rate_test" });
+
+      if (res.statusCode === 429) {
+        hit429 = true;
+        const body = JSON.parse(res.body);
+        errMessage = body.error;
+        break;
+      }
+    }
+
+    assert.ok(hit429, "Rate limiter responded with HTTP 429 after exceeding limit");
+    assert.match(errMessage, /Too many flag submissions/i, "Rate limit error message returned");
+  } finally {
+    db.prepare("DELETE FROM solves WHERE team_name = ?").run(rlTeam);
+    db.prepare("DELETE FROM sessions WHERE team_name = ?").run(rlTeam);
+    db.prepare("DELETE FROM teams WHERE name = ?").run(rlTeam);
+    await makeRequest("POST", "/admin/state", {
+      "Content-Type": "application/json",
+      "X-Admin-Token": TEST_ADMIN_TOKEN
+    }, { layout: "wait" });
+  }
+});
+
+test("Expansion: Invalid flag rejection returns HTTP 400 and awards 0 points on an unlocked challenge", async () => {
+  await makeRequest("POST", "/admin/state", {
+    "Content-Type": "application/json",
+    "X-Admin-Token": TEST_ADMIN_TOKEN
+  }, { layout: "start" });
+
+  const wfTeam = `WFTeam_${Date.now()}`;
+  const wfToken = `wf_tok_${Date.now()}`;
+
+  try {
+    db.prepare("INSERT INTO teams (name, password_hash, points, member1_name, member1_usn, has_logged_in) VALUES (?, 'h', 0, 'WFUser', '1MS21CS070', 1)").run(wfTeam);
+    db.prepare("INSERT INTO sessions (token, team_name) VALUES (?, ?)").run(wfToken, wfTeam);
+
+    const res = await makeRequest("POST", "/solve", {
+      "Content-Type": "application/json",
+      Cookie: `session=${wfToken}`
+    }, { challengeId: 1, flag: "CTF{completely_invalid_flag_submission}" });
+
+    assert.equal(res.statusCode, 400, "Invalid flag returns HTTP 400");
+    const body = JSON.parse(res.body);
+    assert.equal(body.error, "Incorrect flag.", "Error message is 'Incorrect flag.'");
+
+    const solves = db.prepare("SELECT * FROM solves WHERE team_name = ?").all(wfTeam);
+    assert.equal(solves.length, 0, "No solve rows inserted in database");
+
+    const team = db.prepare("SELECT points FROM teams WHERE name = ?").get(wfTeam);
+    assert.equal(team.points, 0, "Team score remains 0");
+  } finally {
+    db.prepare("DELETE FROM solves WHERE team_name = ?").run(wfTeam);
+    db.prepare("DELETE FROM sessions WHERE team_name = ?").run(wfTeam);
+    db.prepare("DELETE FROM teams WHERE name = ?").run(wfTeam);
+    await makeRequest("POST", "/admin/state", {
+      "Content-Type": "application/json",
+      "X-Admin-Token": TEST_ADMIN_TOKEN
+    }, { layout: "wait" });
+  }
+});
+
+test("Expansion: Sensitive root file security returns HTTP 403 Forbidden for server.js, organizer solutions, and sensitive files", async () => {
+  const sensitiveEndpoints = [
+    "/server.js",
+    "/organizer/solutions_001_031.md",
+    "/organizer/set_flags_001_031.sql",
+    "/package.json",
+    "/.env",
+    "/tests/platform.test.js"
+  ];
+
+  for (const ep of sensitiveEndpoints) {
+    const res = await makeRequest("GET", ep);
+    assert.equal(res.statusCode, 403, `${ep} returns HTTP 403 Forbidden`);
+    assert.match(res.body, /Forbidden/, `${ep} response body mentions Forbidden`);
+  }
+});
+
+test("Expansion: Query parameter endpoint routing resolves API endpoints with cache-busters or query strings", async () => {
+  // Unauthenticated /session?t=1 returns 401, not 404
+  const resUnauth = await makeRequest("GET", "/session?t=1");
+  assert.equal(resUnauth.statusCode, 401, "GET /session?t=1 returns 401 Unauthorized (not 404)");
+
+  // GET /state?cachebust=123 returns 200, not 404
+  const resState = await makeRequest("GET", "/state?cachebust=123");
+  assert.equal(resState.statusCode, 200, "GET /state?cachebust=123 returns 200 OK (not 404)");
+
+  // Authenticated /session?_t=456 returns 200 with team info
+  const qTeam = `QTeam_${Date.now()}`;
+  const qToken = `q_tok_${Date.now()}`;
+  try {
+    db.prepare("INSERT INTO teams (name, password_hash, points, member1_name, member1_usn, has_logged_in) VALUES (?, 'h', 0, 'QUser', '1MS21CS080', 1)").run(qTeam);
+    db.prepare("INSERT INTO sessions (token, team_name) VALUES (?, ?)").run(qToken, qTeam);
+
+    const resAuth = await makeRequest("GET", "/session?_t=456", {
+      Cookie: `session=${qToken}`
+    });
+    assert.equal(resAuth.statusCode, 200, "GET /session?_t=456 returns 200 OK");
+    const data = JSON.parse(resAuth.body);
+    assert.equal(data.loggedIn, true);
+    assert.equal(data.teamName, qTeam);
+  } finally {
+    db.prepare("DELETE FROM sessions WHERE team_name = ?").run(qTeam);
+    db.prepare("DELETE FROM teams WHERE name = ?").run(qTeam);
+  }
+});
+
+test("Expansion: Cross-team duplicate USN registration is rejected with HTTP 400", async () => {
+  const team1 = `USNTeamA_${Date.now()}`;
+  const team2 = `USNTeamB_${Date.now()}`;
+  const team3 = `USNTeamC_${Date.now()}`;
+  const uniqueUSN = "1MS21CS701";
+
+  try {
+    const res1 = await makeRequest("POST", "/register", {
+      "Content-Type": "application/json"
+    }, {
+      teamName: team1,
+      password: "password123",
+      members: [
+        { name: "Original Member", usn: uniqueUSN }
+      ]
+    });
+    assert.equal(res1.statusCode, 201, "First team registers successfully");
+
+    // Second team attempts to register using the exact same USN
+    const res2 = await makeRequest("POST", "/register", {
+      "Content-Type": "application/json"
+    }, {
+      teamName: team2,
+      password: "password123",
+      members: [
+        { name: "Duplicate Member", usn: uniqueUSN }
+      ]
+    });
+    assert.equal(res2.statusCode, 400, "Second team registration returns 400 Bad Request");
+    const body2 = JSON.parse(res2.body);
+    assert.match(body2.error, /already registered/i, "Error message states USN is already registered");
+
+    // Third team attempts with lowercase USN
+    const res3 = await makeRequest("POST", "/register", {
+      "Content-Type": "application/json"
+    }, {
+      teamName: team3,
+      password: "password123",
+      members: [
+        { name: "Other Member", usn: "1MS21CS702" },
+        { name: "Case Duplicate", usn: uniqueUSN.toLowerCase() }
+      ]
+    });
+    assert.equal(res3.statusCode, 400, "Case-insensitive duplicate USN registration returns 400");
+    const body3 = JSON.parse(res3.body);
+    assert.match(body3.error, /already registered/i, "Error message states USN is already registered");
+  } finally {
+    db.prepare("DELETE FROM sessions WHERE team_name IN (?, ?, ?)").run(team1, team2, team3);
+    db.prepare("DELETE FROM teams WHERE name IN (?, ?, ?)").run(team1, team2, team3);
+  }
+});
+
+test("WebSocket & Event Sync: leaderboard_update broadcast retains active event layout", async () => {
+  await makeRequest("POST", "/admin/state", {
+    "Content-Type": "application/json",
+    "X-Admin-Token": TEST_ADMIN_TOKEN
+  }, { layout: "start" });
+
+  const testTeam = `WsLayoutTeam_${Date.now()}`;
+  const regRes = await makeRequest("POST", "/register", {
+    "Content-Type": "application/json"
+  }, {
+    teamName: testTeam,
+    password: "password123",
+    members: [{ name: "Ws Member", usn: `WS${Date.now().toString().slice(-8)}` }]
+  });
+  assert.equal(regRes.statusCode, 201);
+  const cookie = regRes.headers["set-cookie"]?.[0]?.split(";")[0];
+
+  const ws = new WebSocket(`ws://127.0.0.1:3099`);
+  const messages = [];
+  ws.on("message", (data) => {
+    try {
+      messages.push(JSON.parse(data.toString()));
+    } catch {}
+  });
+
+  await new Promise((resolve) => ws.on("open", resolve));
+
+  try {
+    // Submit flag for Challenge 1
+    const solveRes = await makeRequest("POST", "/solve", {
+      "Content-Type": "application/json",
+      "Cookie": cookie
+    }, {
+      challengeId: 1,
+      flag: "CTF{c2005_16_20}"
+    });
+    assert.equal(solveRes.statusCode, 200);
+
+    // Wait briefly for WS broadcast
+    await new Promise((r) => setTimeout(r, 100));
+
+    // Check that leaderboard_update messages contain layout: 'start'
+    const lbUpdates = messages.filter((m) => m.type === "leaderboard_update");
+    assert.ok(lbUpdates.length > 0, "Received at least one leaderboard_update message");
+    for (const msg of lbUpdates) {
+      assert.equal(msg.layout, "start", "leaderboard_update payload preserves active event layout ('start')");
+    }
+  } finally {
+    ws.close();
+    db.prepare("DELETE FROM solves WHERE team_name = ?").run(testTeam);
+    db.prepare("DELETE FROM sessions WHERE team_name = ?").run(testTeam);
+    db.prepare("DELETE FROM teams WHERE name = ?").run(testTeam);
+    await makeRequest("POST", "/admin/state", {
+      "Content-Type": "application/json",
+      "X-Admin-Token": TEST_ADMIN_TOKEN
+    }, { layout: "wait" });
+  }
+});
+
+test("Solve Notification: /solve returns basePoints, bonusPercent, and pointsAwarded for marks + bonus and just marks", async () => {
+  await makeRequest("POST", "/admin/state", {
+    "Content-Type": "application/json",
+    "X-Admin-Token": TEST_ADMIN_TOKEN
+  }, { layout: "start" });
+
+  const teamBonus = `BonusTeam_${Date.now()}`;
+  const regBonus = await makeRequest("POST", "/register", {
+    "Content-Type": "application/json"
+  }, {
+    teamName: teamBonus,
+    password: "password123",
+    members: [{ name: "Bonus Member", usn: `BN${Date.now().toString().slice(-8)}` }]
+  });
+  assert.equal(regBonus.statusCode, 201);
+  const cookieBonus = regBonus.headers["set-cookie"]?.[0]?.split(";")[0];
+
+  try {
+    // Challenge 3 (Web, 100 points, 0 previous solves -> First Blood 130%)
+    db.prepare("UPDATE challenges SET solve_count = 0 WHERE id = 3").run();
+    db.prepare("DELETE FROM solves WHERE challenge_id = 3").run();
+
+    const resBonus = await makeRequest("POST", "/solve", {
+      "Content-Type": "application/json",
+      "Cookie": cookieBonus
+    }, {
+      challengeId: 3,
+      flag: "CTF{look_beyond_rendered_pages_inspect_the_sources}"
+    });
+    assert.equal(resBonus.statusCode, 200);
+    const bodyBonus = JSON.parse(resBonus.body);
+    assert.equal(bodyBonus.success, true);
+    assert.equal(bodyBonus.basePoints, 100, "basePoints returned");
+    assert.equal(bodyBonus.bonusPercent, 30, "bonusPercent is 30 for first blood");
+    assert.equal(bodyBonus.pointsAwarded, 130, "pointsAwarded includes marks + bonus (130)");
+
+    // Simulate 3 more solves so the next solve gets just marks (0% bonus)
+    db.prepare("UPDATE challenges SET solve_count = 3 WHERE id = 3").run();
+    db.prepare("DELETE FROM solves WHERE challenge_id = 3 AND team_name = ?").run(teamBonus);
+
+    const resJustMarks = await makeRequest("POST", "/solve", {
+      "Content-Type": "application/json",
+      "Cookie": cookieBonus
+    }, {
+      challengeId: 3,
+      flag: "CTF{look_beyond_rendered_pages_inspect_the_sources}"
+    });
+    assert.equal(resJustMarks.statusCode, 200);
+    const bodyJustMarks = JSON.parse(resJustMarks.body);
+    assert.equal(bodyJustMarks.success, true);
+    assert.equal(bodyJustMarks.basePoints, 100);
+    assert.equal(bodyJustMarks.bonusPercent, 0, "bonusPercent is 0 for 4th solve");
+    assert.equal(bodyJustMarks.pointsAwarded, 100, "pointsAwarded is just marks (100)");
+  } finally {
+    db.prepare("DELETE FROM solves WHERE team_name = ?").run(teamBonus);
+    db.prepare("DELETE FROM sessions WHERE team_name = ?").run(teamBonus);
+    db.prepare("DELETE FROM teams WHERE name = ?").run(teamBonus);
     await makeRequest("POST", "/admin/state", {
       "Content-Type": "application/json",
       "X-Admin-Token": TEST_ADMIN_TOKEN

@@ -81,6 +81,7 @@ const db = new DatabaseSync(dbPath);
 
 db.exec("PRAGMA foreign_keys = ON;");
 db.exec("PRAGMA journal_mode = WAL;");
+db.exec("PRAGMA busy_timeout = 5000;");
 
 // Initialize tables if they do not exist
 db.exec(`
@@ -207,6 +208,13 @@ function verifyAdminToken(providedToken) {
     return crypto.timingSafeEqual(provided, expected);
 }
 
+function timingSafeCompare(a, b) {
+    if (typeof a !== "string" || typeof b !== "string") return false;
+    const hashA = crypto.createHash("sha256").update(a).digest();
+    const hashB = crypto.createHash("sha256").update(b).digest();
+    return crypto.timingSafeEqual(hashA, hashB);
+}
+
 
 // ============================================================
 // CTF state & Countdown Timer
@@ -219,10 +227,12 @@ const state = {
 
 let timerTimeout = null;
 
+const MAX_TIMER_MS = 2147483647; // 2^31 - 1
+
 // Parse HH:MM:SS or HH:MM or numeric ms
 function parseDuration(input) {
     if (typeof input === "number") {
-        return input > 0 ? input : null;
+        return input > 0 ? Math.min(input, MAX_TIMER_MS) : null;
     }
     if (typeof input !== "string") return null;
     const trimmed = input.trim();
@@ -235,18 +245,19 @@ function parseDuration(input) {
     if (parts.length === 3 && parts.every(p => !isNaN(p) && p >= 0)) {
         const [hours, minutes, seconds] = parts;
         const totalMs = (hours * 3600 + minutes * 60 + seconds) * 1000;
-        return totalMs > 0 ? totalMs : null;
+        return totalMs > 0 ? Math.min(totalMs, MAX_TIMER_MS) : null;
     }
     // MM:SS format
     if (parts.length === 2 && parts.every(p => !isNaN(p) && p >= 0)) {
         const [minutes, seconds] = parts;
         const totalMs = (minutes * 60 + seconds) * 1000;
-        return totalMs > 0 ? totalMs : null;
+        return totalMs > 0 ? Math.min(totalMs, MAX_TIMER_MS) : null;
     }
     // Pure integer seconds
     if (/^\d+$/.test(trimmed)) {
         const secs = parseInt(trimmed, 10);
-        return secs > 0 ? secs * 1000 : null;
+        const totalMs = secs * 1000;
+        return totalMs > 0 ? Math.min(totalMs, MAX_TIMER_MS) : null;
     }
     return null;
 }
@@ -321,13 +332,14 @@ function setEventTimer(durationMs) {
         return;
     }
 
-    state.timerEnd = Date.now() + durationMs;
+    const clampedMs = Math.min(durationMs, MAX_TIMER_MS);
+    state.timerEnd = Date.now() + clampedMs;
     state.layout = "start";
-    console.log(`Event timer set for ${durationMs}ms (ends at ${new Date(state.timerEnd).toISOString()})`);
+    console.log(`Event timer set for ${clampedMs}ms (ends at ${new Date(state.timerEnd).toISOString()})`);
 
     timerTimeout = setTimeout(() => {
         getAuthoritativeState();
-    }, durationMs);
+    }, clampedMs);
 }
 
 // Rate limiting: track requests per team/session
@@ -508,9 +520,14 @@ function setCORS(
             const originURL =
                 new URL(origin);
 
-            const serverHost =
-                req.headers.host
-                    .split(":")[0];
+            let serverHost = "";
+            if (req.headers.host) {
+                try {
+                    serverHost = new URL(`http://${req.headers.host}`).hostname;
+                } catch {
+                    serverHost = req.headers.host.split(":")[0];
+                }
+            }
 
             if (
                 originURL.protocol === "http:" &&
@@ -545,7 +562,7 @@ function setCORS(
 
     res.setHeader(
         "Access-Control-Allow-Headers",
-        "Content-Type"
+        "Content-Type, X-Admin-Token, Authorization"
     );
 }
 
@@ -753,6 +770,13 @@ const server =
                 res
             );
 
+            let pathname = "/";
+            try {
+                pathname = new URL(req.url, "http://localhost").pathname;
+            } catch {
+                pathname = (req.url || "/").split("?")[0];
+            }
+
 
             // ------------------------------------------------
             // CORS preflight
@@ -776,7 +800,7 @@ const server =
 
             if (
                 req.method === "POST" &&
-                req.url === "/register"
+                pathname === "/register"
             ) {
 
                 let data;
@@ -991,6 +1015,29 @@ const server =
                     }
                 }
 
+                // Check whether any submitted USN already belongs to another team
+                for (const item of enteredUSNs) {
+                    const existingTeam = db.prepare(`
+                        SELECT name FROM teams
+                        WHERE UPPER(member1_usn) = UPPER(?)
+                           OR UPPER(member2_usn) = UPPER(?)
+                           OR UPPER(member3_usn) = UPPER(?)
+                    `).get(item.usn, item.usn, item.usn);
+
+                    if (existingTeam) {
+                        sendJSON(
+                            res,
+                            400,
+                            {
+                                error:
+                                    `USN ${item.usn.toUpperCase()} is already registered with another team (${existingTeam.name}).`
+                            }
+                        );
+
+                        return;
+                    }
+                }
+
 
                 const salt =
                     crypto.randomBytes(16);
@@ -1053,7 +1100,9 @@ const server =
                     db.exec("COMMIT");
 
                     const lbBroadcast = JSON.stringify({
-                        type: "leaderboard_update"
+                        type: "leaderboard_update",
+                        layout: state.layout,
+                        timerEnd: state.timerEnd
                     });
                     for (const client of wss.clients) {
                         if (client.readyState === WebSocket.OPEN) {
@@ -1137,7 +1186,7 @@ const server =
 
             if (
                 req.method === "POST" &&
-                req.url === "/login"
+                pathname === "/login"
             ) {
 
                 let data;
@@ -1268,7 +1317,9 @@ const server =
                     `).run(teamName);
 
                     const lbBroadcast = JSON.stringify({
-                        type: "leaderboard_update"
+                        type: "leaderboard_update",
+                        layout: state.layout,
+                        timerEnd: state.timerEnd
                     });
                     for (const client of wss.clients) {
                         if (client.readyState === WebSocket.OPEN) {
@@ -1327,7 +1378,7 @@ const server =
 
             if (
                 req.method === "GET" &&
-                req.url === "/session"
+                pathname === "/session"
             ) {
 
                 const teamName =
@@ -1376,7 +1427,7 @@ const server =
 
             if (
                 (req.method === "POST" || req.method === "GET") &&
-                req.url === "/logout"
+                pathname === "/logout"
             ) {
 
                 const sessionID =
@@ -1435,7 +1486,9 @@ const server =
                 );
 
                 const lbBroadcast = JSON.stringify({
-                    type: "leaderboard_update"
+                    type: "leaderboard_update",
+                    layout: state.layout,
+                    timerEnd: state.timerEnd
                 });
                 for (const client of wss.clients) {
                     if (client.readyState === WebSocket.OPEN) {
@@ -1456,7 +1509,7 @@ const server =
 
             if (
                 req.method === "GET" &&
-                req.url === "/progress"
+                pathname === "/progress"
             ) {
 
                 const teamName =
@@ -1514,7 +1567,7 @@ const server =
 
             if (
                 req.method === "GET" &&
-                req.url === "/state"
+                pathname === "/state"
             ) {
 
                 sendJSON(
@@ -1533,7 +1586,7 @@ const server =
 
                         if (
                 req.method === "POST" &&
-                req.url === "/solve"
+                pathname === "/solve"
             ) {
 
                 const teamName =
@@ -1731,8 +1784,7 @@ const server =
                 // Check flag.
 
                 if (
-                    submittedFlag !==
-                    challenge.flag
+                    !timingSafeCompare(submittedFlag, challenge.flag)
                 ) {
 
                     sendJSON(
@@ -1847,8 +1899,7 @@ const server =
 
                     if (
                         !currentChallenge ||
-                        currentChallenge.flag !==
-                            submittedFlag
+                        !timingSafeCompare(currentChallenge.flag, submittedFlag)
                     ) {
 
                         db.exec(
@@ -1987,6 +2038,7 @@ const server =
                     res.end(
                         JSON.stringify({
                             success: true,
+                            basePoints: challengeInfo.points,
                             bonusPercent,
                             pointsAwarded,
                             totalPoints:
@@ -1999,7 +2051,11 @@ const server =
                     // Broadcast real-time score and progress update to any connected sockets for this team
                     const progressBroadcast = JSON.stringify({
                         type: "progress",
+                        challengeId: challengeID,
                         points: progress.points,
+                        pointsAwarded,
+                        basePoints: challengeInfo.points,
+                        bonusPercent,
                         solved: progress.solved
                     });
                     for (const client of wss.clients) {
@@ -2010,7 +2066,9 @@ const server =
 
                     // Also broadcast real-time leaderboard update notification to all clients
                     const lbBroadcast = JSON.stringify({
-                        type: "leaderboard_update"
+                        type: "leaderboard_update",
+                        layout: state.layout,
+                        timerEnd: state.timerEnd
                     });
                     for (const client of wss.clients) {
                         if (client.readyState === WebSocket.OPEN) {
@@ -2053,7 +2111,7 @@ const server =
 
             if (
                 req.method === "POST" &&
-                req.url === "/admin/state"
+                pathname === "/admin/state"
             ) {
                 const authHeader = req.headers.authorization || "";
                 const bearerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : null;
@@ -2124,7 +2182,7 @@ const server =
 
             if (
                 req.method === "GET" &&
-                (req.url === "/api/leaderboard" || req.url === "/leaderboard/data" || req.url === "/leaderboard.json")
+                (pathname === "/api/leaderboard" || pathname === "/leaderboard/data" || pathname === "/leaderboard.json")
             ) {
                 const currentTeam = getTeamFromSession(req);
 
@@ -2173,7 +2231,7 @@ const server =
                 const staticDir = existsSync(distDir) ? distDir : __dirname;
                 let urlPath;
                 try {
-                    urlPath = decodeURIComponent(req.url.split("?")[0]);
+                    urlPath = decodeURIComponent(pathname);
                 } catch {
                     res.writeHead(400);
                     res.end("Bad Request");
@@ -2197,23 +2255,27 @@ const server =
                     cleanPath = "main.html";
                 }
 
-                // Prevent access to server code, DBs, and configs if falling back to project root
-                if (staticDir === __dirname) {
-                    const normalized = cleanPath.toLowerCase();
-                    if (
-                        normalized.startsWith(".") ||
-                        normalized.startsWith("server") ||
-                        normalized.startsWith("tests") ||
-                        normalized.includes("package") ||
-                        normalized.endsWith(".sqlite") ||
-                        normalized.endsWith(".db") ||
-                        normalized.endsWith(".env") ||
-                        normalized.endsWith(".md")
-                    ) {
-                        res.writeHead(403);
-                        res.end("Forbidden");
-                        return;
-                    }
+                // Prevent access to server code, DBs, organizer files, tests, configs, and sensitive files unconditionally
+                const normalized = cleanPath.toLowerCase();
+                if (
+                    normalized.startsWith(".") ||
+                    normalized.includes("/.") ||
+                    normalized.startsWith("server") ||
+                    normalized.includes("/server") ||
+                    normalized.startsWith("tests") ||
+                    normalized.includes("/tests") ||
+                    normalized.startsWith("organizer") ||
+                    normalized.includes("/organizer") ||
+                    normalized.includes("package") ||
+                    normalized.endsWith(".sqlite") ||
+                    normalized.endsWith(".db") ||
+                    normalized.endsWith(".env") ||
+                    normalized.endsWith(".md") ||
+                    normalized.endsWith(".sql")
+                ) {
+                    res.writeHead(403);
+                    res.end("Forbidden");
+                    return;
                 }
 
                 let filePath = path.join(staticDir, cleanPath);
@@ -2244,11 +2306,13 @@ const server =
                 // Fallback for public assets / challenges when running from __dirname or dist
                 if (!existsSync(resolvedPath)) {
                     const publicCandidate = path.resolve(path.join(__dirname, "public", cleanPath));
-                    const rootCandidate = path.resolve(path.join(__dirname, cleanPath));
                     if (existsSync(publicCandidate)) {
                         resolvedPath = publicCandidate;
-                    } else if (existsSync(rootCandidate)) {
-                        resolvedPath = rootCandidate;
+                    } else if (staticDir === __dirname) {
+                        const rootCandidate = path.resolve(path.join(__dirname, cleanPath));
+                        if (existsSync(rootCandidate)) {
+                            resolvedPath = rootCandidate;
+                        }
                     }
                 }
 
@@ -2429,6 +2493,14 @@ const heartbeatInterval = setInterval(() => {
         client.isAlive = false;
         client.ping();
     }
+    for (const client of vmTunnelWss.clients) {
+        if (client.isAlive === false) {
+            client.terminate();
+            continue;
+        }
+        client.isAlive = false;
+        client.ping();
+    }
 }, 30000);
 
 wss.on("close", () => {
@@ -2439,6 +2511,18 @@ wss.on("close", () => {
 
 vmTunnelWss.on("connection", (socket, request, teamName) => {
     console.log(`VM tunnel WebSocket connected for team: ${teamName}`);
+
+    socket.isAlive = true;
+    socket.on("pong", () => {
+        socket.isAlive = true;
+    });
+
+    const existingTunnel = activeTunnels.get(teamName);
+    if (existingTunnel && existingTunnel !== socket) {
+        try {
+            existingTunnel.terminate();
+        } catch {}
+    }
     activeTunnels.set(teamName, socket);
 
     socket.on("close", () => {
@@ -2779,4 +2863,4 @@ server.listen(
     }
 );
 
-export { server, wss, vmTunnelWss, sshServer, db, state, ADMIN_TOKEN, verifyAdminToken, parseDuration, setEventTimer };
+export { server, wss, vmTunnelWss, sshServer, db, state, ADMIN_TOKEN, verifyAdminToken, parseDuration, setEventTimer, rateLimitMap };

@@ -125,6 +125,78 @@ function setupLogout() {
     }
 }
 
+function notify({ title, message, type = "info", duration = 6500 }) {
+    let container = document.getElementById("ctfNotifyContainer");
+    if (!container) {
+        container = document.createElement("div");
+        container.id = "ctfNotifyContainer";
+        container.style.cssText = "position: fixed; top: 85px; right: 24px; z-index: 99999; display: flex; flex-direction: column; gap: 12px; max-width: 440px; pointer-events: none;";
+        document.body.appendChild(container);
+    }
+
+    const toast = document.createElement("div");
+    toast.className = `ctf-toast ctf-toast-${type}`;
+    const isBonus = type === "bonus";
+    const accentColor = isBonus ? "#f59e0b" : "#10b981";
+    const glowColor = isBonus ? "rgba(245, 158, 11, 0.35)" : "rgba(16, 185, 129, 0.3)";
+
+    toast.style.cssText = `
+        pointer-events: auto;
+        background: rgba(15, 23, 42, 0.95);
+        border: 1px solid ${accentColor};
+        border-left: 5px solid ${accentColor};
+        border-radius: 8px;
+        padding: 14px 18px;
+        color: #f1f5f9;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6), 0 0 18px ${glowColor};
+        backdrop-filter: blur(12px);
+        font-family: 'Jost', system-ui, -apple-system, sans-serif;
+        transform: translateX(120%);
+        opacity: 0;
+        transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.35s ease;
+    `;
+
+    const header = document.createElement("div");
+    header.style.cssText = "display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;";
+
+    const titleEl = document.createElement("strong");
+    titleEl.style.cssText = `font-size: 15px; font-weight: 700; color: ${isBonus ? "#fbbf24" : "#34d399"}; letter-spacing: 0.3px;`;
+    titleEl.textContent = title;
+
+    const closeBtn = document.createElement("button");
+    closeBtn.type = "button";
+    closeBtn.innerHTML = "&times;";
+    closeBtn.style.cssText = "background: none; border: none; color: #94a3b8; font-size: 20px; cursor: pointer; padding: 0 4px; line-height: 1;";
+    closeBtn.onclick = () => dismiss();
+
+    header.appendChild(titleEl);
+    header.appendChild(closeBtn);
+
+    const bodyEl = document.createElement("div");
+    bodyEl.style.cssText = "font-size: 13.5px; line-height: 1.5; color: #cbd5e1;";
+    bodyEl.textContent = message;
+
+    toast.appendChild(header);
+    toast.appendChild(bodyEl);
+    container.appendChild(toast);
+
+    requestAnimationFrame(() => {
+        toast.style.transform = "translateX(0)";
+        toast.style.opacity = "1";
+    });
+
+    let timeoutId = setTimeout(dismiss, duration);
+
+    function dismiss() {
+        clearTimeout(timeoutId);
+        toast.style.transform = "translateX(120%)";
+        toast.style.opacity = "0";
+        setTimeout(() => {
+            if (toast.parentNode) toast.parentNode.removeChild(toast);
+        }, 400);
+    }
+}
+
 function connectWebSocket() {
     if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
         return;
@@ -146,6 +218,26 @@ function connectWebSocket() {
                 const pointsEl = document.getElementById("navPoints");
                 if (pointsEl && typeof state.points === "number") {
                     pointsEl.textContent = state.points;
+                }
+                if (typeof state.pointsAwarded === "number") {
+                    const awarded = state.pointsAwarded;
+                    const base = state.basePoints || awarded;
+                    const bonusPct = state.bonusPercent || 0;
+                    const bonusPts = awarded - base;
+                    const hasBonus = bonusPct > 0 && bonusPts > 0;
+                    if (hasBonus) {
+                        notify({
+                            title: "Marks + Bonus Received! 🎯",
+                            message: `Your team received marks + bonus: +${awarded} marks (${base} base + ${bonusPts} First Blood bonus [${bonusPct}%])!`,
+                            type: "bonus"
+                        });
+                    } else {
+                        notify({
+                            title: "Marks Received! 🏁",
+                            message: `Your team received just marks: +${awarded} marks.`,
+                            type: "success"
+                        });
+                    }
                 }
                 if (Array.isArray(state.solved)) {
                     const prevIds = [...solvedChallengeIds].sort().join(",");
@@ -292,6 +384,26 @@ async function start() {
             if (event.data && typeof event.data.points === "number") {
                 const pointsEl = document.getElementById("navPoints");
                 if (pointsEl) pointsEl.textContent = event.data.points;
+            }
+            if (event.data && typeof event.data.pointsAwarded === "number") {
+                const awarded = event.data.pointsAwarded;
+                const base = event.data.basePoints || awarded;
+                const bonusPct = event.data.bonusPercent || 0;
+                const bonusPts = awarded - base;
+                const hasBonus = bonusPct > 0 && bonusPts > 0;
+                if (hasBonus) {
+                    notify({
+                        title: "Marks + Bonus Received! 🎯",
+                        message: `Your team received marks + bonus: +${awarded} marks (${base} base + ${bonusPts} First Blood bonus [${bonusPct}%])!`,
+                        type: "bonus"
+                    });
+                } else {
+                    notify({
+                        title: "Marks Received! 🏁",
+                        message: `Your team received just marks: +${awarded} marks.`,
+                        type: "success"
+                    });
+                }
             }
             if (event.data && Array.isArray(event.data.solved)) {
                 const prevIds = [...solvedChallengeIds].sort().join(",");

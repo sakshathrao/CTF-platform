@@ -92,6 +92,78 @@ async function getJSON(path) {
   return response.json();
 }
 
+function notify({ title, message, type = "info", duration = 6500 }) {
+  let container = document.getElementById("ctfNotifyContainer");
+  if (!container) {
+    container = document.createElement("div");
+    container.id = "ctfNotifyContainer";
+    container.style.cssText = "position: fixed; top: 85px; right: 24px; z-index: 99999; display: flex; flex-direction: column; gap: 12px; max-width: 440px; pointer-events: none;";
+    document.body.appendChild(container);
+  }
+
+  const toast = document.createElement("div");
+  toast.className = `ctf-toast ctf-toast-${type}`;
+  const isBonus = type === "bonus";
+  const accentColor = isBonus ? "#f59e0b" : "#10b981";
+  const glowColor = isBonus ? "rgba(245, 158, 11, 0.35)" : "rgba(16, 185, 129, 0.3)";
+
+  toast.style.cssText = `
+    pointer-events: auto;
+    background: rgba(15, 23, 42, 0.95);
+    border: 1px solid ${accentColor};
+    border-left: 5px solid ${accentColor};
+    border-radius: 8px;
+    padding: 14px 18px;
+    color: #f1f5f9;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6), 0 0 18px ${glowColor};
+    backdrop-filter: blur(12px);
+    font-family: 'Jost', system-ui, -apple-system, sans-serif;
+    transform: translateX(120%);
+    opacity: 0;
+    transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.35s ease;
+  `;
+
+  const header = document.createElement("div");
+  header.style.cssText = "display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;";
+
+  const titleEl = document.createElement("strong");
+  titleEl.style.cssText = `font-size: 15px; font-weight: 700; color: ${isBonus ? "#fbbf24" : "#34d399"}; letter-spacing: 0.3px;`;
+  titleEl.textContent = title;
+
+  const closeBtn = document.createElement("button");
+  closeBtn.type = "button";
+  closeBtn.innerHTML = "&times;";
+  closeBtn.style.cssText = "background: none; border: none; color: #94a3b8; font-size: 20px; cursor: pointer; padding: 0 4px; line-height: 1;";
+  closeBtn.onclick = () => dismiss();
+
+  header.appendChild(titleEl);
+  header.appendChild(closeBtn);
+
+  const bodyEl = document.createElement("div");
+  bodyEl.style.cssText = "font-size: 13.5px; line-height: 1.5; color: #cbd5e1;";
+  bodyEl.textContent = message;
+
+  toast.appendChild(header);
+  toast.appendChild(bodyEl);
+  container.appendChild(toast);
+
+  requestAnimationFrame(() => {
+    toast.style.transform = "translateX(0)";
+    toast.style.opacity = "1";
+  });
+
+  let timeoutId = setTimeout(dismiss, duration);
+
+  function dismiss() {
+    clearTimeout(timeoutId);
+    toast.style.transform = "translateX(120%)";
+    toast.style.opacity = "0";
+    setTimeout(() => {
+      if (toast.parentNode) toast.parentNode.removeChild(toast);
+    }, 400);
+  }
+}
+
 function applySolvedState(msg) {
   solved = true;
   const { input, button, status } = getElements();
@@ -104,10 +176,11 @@ function applySolvedState(msg) {
 }
 
 function renderEventState(state) {
+  if (!state || typeof state.layout !== "string") return;
   const { shell, closed, button, status } = getElements();
-  eventStarted = Boolean(state && state.layout === "start");
+  eventStarted = Boolean(state.layout === "start");
 
-  if (state && typeof state.timerEnd === "number" && Date.now() >= state.timerEnd) {
+  if (typeof state.timerEnd === "number" && Date.now() >= state.timerEnd) {
     eventStarted = false;
   }
 
@@ -157,17 +230,45 @@ async function submitFlag(event) {
     const data = await response.json().catch(() => ({}));
 
     if (response.ok && data.success) {
-      const pts = data.totalPoints ?? data.pointsAwarded ?? DEFAULT_POINTS;
+      const awarded = data.pointsAwarded ?? DEFAULT_POINTS;
+      const base = data.basePoints ?? DEFAULT_POINTS;
+      const bonusPct = data.bonusPercent ?? 0;
+      const bonusPts = awarded - base;
+      const hasBonus = bonusPct > 0 && bonusPts > 0;
+
       const pointsEl = document.getElementById("navPoints");
       if (pointsEl && typeof data.totalPoints === "number") {
         pointsEl.textContent = data.totalPoints;
       }
       try {
         const bc = new BroadcastChannel("ctf_progress");
-        bc.postMessage({ type: "progress", points: data.totalPoints, solved: [CHALLENGE_ID] });
+        bc.postMessage({
+          type: "progress",
+          challengeId: CHALLENGE_ID,
+          points: data.totalPoints,
+          pointsAwarded: awarded,
+          basePoints: base,
+          bonusPercent: bonusPct,
+          solved: data.solved || [CHALLENGE_ID]
+        });
         bc.close();
       } catch {}
-      applySolvedState(`CASE CLOSED — +${data.pointsAwarded ?? DEFAULT_POINTS} POINTS`);
+
+      if (hasBonus) {
+        notify({
+          title: "Marks + Bonus Received! 🎯",
+          message: `Your team received marks + bonus: +${awarded} marks (${base} base + ${bonusPts} First Blood bonus [${bonusPct}%])!`,
+          type: "bonus"
+        });
+        applySolvedState(`CASE CLOSED — +${awarded} MARKS (MARKS + BONUS: ${base} BASE + ${bonusPts} BONUS)`);
+      } else {
+        notify({
+          title: "Marks Received! 🏁",
+          message: `Your team received just marks: +${awarded} marks.`,
+          type: "success"
+        });
+        applySolvedState(`CASE CLOSED — +${awarded} MARKS (JUST MARKS)`);
+      }
       return;
     }
     if (response.status === 401) {
@@ -193,7 +294,8 @@ function connectSocket() {
   ws.addEventListener("message", (event) => {
     try {
       const state = JSON.parse(event.data);
-      if (state && state.type === "progress") {
+      if (!state) return;
+      if (state.type === "progress") {
         const pointsEl = document.getElementById("navPoints");
         if (pointsEl && typeof state.points === "number") {
           pointsEl.textContent = state.points;
@@ -201,9 +303,34 @@ function connectSocket() {
         if (Array.isArray(state.solved) && state.solved.includes(CHALLENGE_ID)) {
           applySolvedState("YOUR TEAM HAS ALREADY SOLVED THIS CASE.");
         }
+        if (typeof state.pointsAwarded === "number" && state.challengeId === CHALLENGE_ID) {
+          const awarded = state.pointsAwarded;
+          const base = state.basePoints || awarded;
+          const bonusPct = state.bonusPercent || 0;
+          const bonusPts = awarded - base;
+          const hasBonus = bonusPct > 0 && bonusPts > 0;
+          if (hasBonus) {
+            notify({
+              title: "Marks + Bonus Received! 🎯",
+              message: `Your team received marks + bonus: +${awarded} marks (${base} base + ${bonusPts} First Blood bonus [${bonusPct}%])!`,
+              type: "bonus"
+            });
+          } else {
+            notify({
+              title: "Marks Received! 🏁",
+              message: `Your team received just marks: +${awarded} marks.`,
+              type: "success"
+            });
+          }
+        }
         return;
       }
-      renderEventState(state);
+      if (state.type === "leaderboard_update") {
+        return;
+      }
+      if (typeof state.layout === "string") {
+        renderEventState(state);
+      }
     } catch (err) {
       console.error("Invalid event state:", err);
     }
@@ -302,6 +429,26 @@ async function init() {
       }
       if (event.data && Array.isArray(event.data.solved) && event.data.solved.includes(CHALLENGE_ID)) {
         applySolvedState("YOUR TEAM HAS ALREADY SOLVED THIS CASE.");
+      }
+      if (event.data && typeof event.data.pointsAwarded === "number" && event.data.challengeId === CHALLENGE_ID) {
+        const awarded = event.data.pointsAwarded;
+        const base = event.data.basePoints || awarded;
+        const bonusPct = event.data.bonusPercent || 0;
+        const bonusPts = awarded - base;
+        const hasBonus = bonusPct > 0 && bonusPts > 0;
+        if (hasBonus) {
+          notify({
+            title: "Marks + Bonus Received! 🎯",
+            message: `Your team received marks + bonus: +${awarded} marks (${base} base + ${bonusPts} First Blood bonus [${bonusPct}%])!`,
+            type: "bonus"
+          });
+        } else {
+          notify({
+            title: "Marks Received! 🏁",
+            message: `Your team received just marks: +${awarded} marks.`,
+            type: "success"
+          });
+        }
       }
     };
   } catch {}

@@ -1,0 +1,6 @@
+NORTH PIER / OPERATOR MEMO
+Recovered from the workstation's printed handover folder.
+
+The records mirror was built for quick retrieval, not secure access control. The prototype stored the selected catalogue slot in the browser so that a page refresh could reopen the same record.
+
+A reviewer previously warned that browser storage should not be treated as proof of authorisation. The warning was marked "to be fixed in next release", but no follow-up was recorded.

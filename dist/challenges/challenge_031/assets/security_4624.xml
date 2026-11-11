@@ -1,0 +1,2 @@
+<?xml version="1.0"?>
+<Event><System><Provider Name="Microsoft-Windows-Security-Auditing"/><EventID>4624</EventID><TimeCreated SystemTime="2026-11-10T08:41:12.000Z"/></System><EventData><Data Name="TargetUserName">archive.operator</Data><Data Name="TargetLogonId">0x77A1</Data><Data Name="IpAddress">10.20.4.41</Data><Data Name="LogonType">2</Data></EventData></Event>

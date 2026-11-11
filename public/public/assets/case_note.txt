@@ -1,0 +1,20 @@
+CASE FILE: NET-04
+UNIT: Network Incident Response
+STATUS: OPEN
+
+A small office gateway was imaged after an employee reported that an internal report had been copied out of the archive service.
+
+The capture was taken from the employee workstation during the relevant period. It contains ordinary background traffic and several HTTP requests. Investigators believe the report was transferred in clear text.
+
+The workstation address was recorded as 10.10.4.21. The archive gateway was 192.0.2.44.
+
+OBJECTIVE
+Identify the HTTP request that retrieves the shift report, reconstruct the corresponding server response, and recover the recovery token contained in the report.
+
+HANDOUT
+Exhibit A — gateway_capture.pcap
+
+SUBMISSION
+Submit the token in the CTF flag format: CTF{...}
+
+You may use Wireshark or another packet-analysis tool. No live network scanning or connection to the captured addresses is necessary.

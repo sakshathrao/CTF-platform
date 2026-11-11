@@ -1,0 +1,23 @@
+EXAMINER REFERENCE CARD
+Chromium History database
+
+Useful commands:
+  file History
+  sqlite3 History
+  .tables
+  .schema downloads
+
+Useful fields in `downloads`:
+  target_path
+  start_time
+  tab_url
+  site_url
+  mime_type
+
+Chromium/WebKit timestamp conversion:
+  datetime(start_time / 1000000 - 11644473600, 'unixepoch')
+
+Example query pattern:
+  SELECT target_path, tab_url,
+         datetime(start_time / 1000000 - 11644473600, 'unixepoch')
+  FROM downloads;

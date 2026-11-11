@@ -1,0 +1,29 @@
+CASE FILE: AR-17
+RECOVERY UNIT: Antiquities & Cultural Property Desk
+STATUS: OPEN
+
+Recovered from the digital inventory of a suspected illicit antiquities broker:
+
+The object is described as a Himalayan bronze protector figure. The witness remembers a fierce face, an elaborate crown, heavy clothing, boots, and a long club held in front of the body.
+
+The broker's handwritten note used the phrase:
+
+    "The Excellent One"
+
+The source of the description is believed to be a public museum collection record. Investigators have not yet matched the object to an official catalogue entry.
+
+TASK
+Identify the exact object represented by the description and find its official museum object / registration number.
+
+Do not submit the deity's name or the museum's name. We need the catalogue identifier.
+
+ANSWER NORMALIZATION
+- Convert letters to lowercase.
+- Replace periods with underscores.
+- Keep all digits.
+- Include the standard CTF wrapper.
+
+Expected structure: CTF{museum_object_number}
+
+IMPORTANT EVIDENCE NOTE
+Exhibit A is an illustrative reconstruction prepared for this case file from the textual description. It is not the museum's original object photograph and must not be treated as provenance evidence. Use it as visual context; verify the identification against a public museum collection record.

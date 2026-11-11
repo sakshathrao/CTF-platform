@@ -1,0 +1,17 @@
+NORTH PIER TECHNICAL LIBRARY
+ARCHIVE DESK REQUEST / ITEM 013
+
+A recovered workstation index references the Python 1.5 library documentation.
+
+The printed reference is:
+
+    http://www.python.org/1.5/
+
+The library copy has no reliable publication date. The archive desk has asked for the earliest successful capture of this exact page in the Internet Archive's Wayback Machine.
+
+Do not substitute:
+- the first capture of the python.org homepage;
+- the first capture of the entire python.org domain;
+- a redirect-only response.
+
+The requested result is the earliest successful HTML page capture for the exact URL above.

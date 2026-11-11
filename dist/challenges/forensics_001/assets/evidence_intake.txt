@@ -1,0 +1,14 @@
+EVIDENCE INTAKE RECORD
+Case: FR-04
+Item: USB image 03
+Recovered filename: recovered_photo.bin
+Acquisition status: Complete
+File system status: Readable
+Preview status: Failed
+
+Initial examiner note:
+The file contains a large amount of binary data but the workstation's image viewer refuses to open it. A quick string scan returned the marker `JFIF`, which may indicate the underlying file format.
+
+No additional files were recovered from the same directory.
+
+Examination is limited to a copy of the evidence file. Preserve the original bytes and work on a duplicate.

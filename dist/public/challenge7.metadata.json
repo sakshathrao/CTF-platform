@@ -1,0 +1,26 @@
+{
+  "id": 7,
+  "title": "The Hidden Handover",
+  "category": "Linux/Misc",
+  "difficulty": "Easy",
+  "points": 100,
+  "type": "static_filesystem_archive",
+  "requires_internet": false,
+  "participant_environment": "Linux terminal, WSL2 or macOS terminal",
+  "recommended_tools": [
+    "unzip",
+    "cd",
+    "ls -la",
+    "find",
+    "cat"
+  ],
+  "asset_directory": "public/challenges/linux_001/assets/",
+  "inspiration": {
+    "challenge": "Bandit Level 3 \u2192 4",
+    "platform": "OverTheWire",
+    "references": [
+      "https://overthewire.org/wargames/bandit/bandit4.html",
+      "https://primer.picoctf.org/"
+    ]
+  }
+}

@@ -1,0 +1,27 @@
+CHALLENGE 004 — TOOL QUICKSTART
+A FEW MISSING BYTES / JPEG HEADER REPAIR
+
+Linux (Kali / Ubuntu / WSL2)
+----------------------------
+Work on a copy of `recovered_photo.bin`.
+
+1. Identify the file:
+   file recovered_photo.bin
+2. Inspect the first bytes:
+   xxd -l 16 recovered_photo.bin
+3. The JFIF marker indicates JPEG data. A JPEG begins with FF D8 FF.
+4. Replace exactly the first two bytes in a new copy:
+   (printf '\xff\xd8'; tail -c +3 recovered_photo.bin) > restored.jpg
+5. Verify:
+   file restored.jpg
+   xxd -l 4 restored.jpg
+
+Windows (HxD)
+-------------
+1. Open a COPY of `recovered_photo.bin` in HxD: https://mh-nexus.de/en/hxd/
+2. At offset `00000000`, select the first TWO bytes.
+3. Use overwrite mode and replace those bytes with `FF D8`. Do not insert bytes.
+4. Save the copy as `restored.jpg`.
+5. Confirm the first four bytes are `FF D8 FF E0`, then open the image.
+
+Only the first two bytes should change. Preserve the original evidence file.

@@ -1,0 +1,1 @@
+Follow the 02:17 journal event to the systemd timer, then its Unit service and EnvironmentFile. Only the tarball is supplied; no loose host_snapshot directory is included.

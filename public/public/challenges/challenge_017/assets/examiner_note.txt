@@ -1,0 +1,1 @@
+The black bar is a drawing object. Check whether the PDF text layer was sanitized. Try pdftotext or select/copy.

@@ -1,0 +1,17 @@
+OSINT EXAMINER NOTE
+Case: OS-13
+Evidence ID: OS-13-A
+
+The question concerns an archived web page, not the current live page.
+
+Use the Internet Archive's Wayback Machine:
+1. Enter the exact URL supplied in Exhibit A / Exhibit B.
+2. Inspect the archive calendar and available captures.
+3. Select the earliest capture that represents a successful page response.
+4. Read the timestamp embedded in the archived snapshot URL.
+
+Wayback snapshot timestamps use this form:
+
+    YYYYMMDDHHMMSS
+
+The requested value is the complete 14-digit timestamp in UTC. Do not convert it to local time or shorten it to a year/month/day.

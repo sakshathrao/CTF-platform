@@ -1,0 +1,1 @@
+MBOX is a concatenation of messages. Inspect message headers before the blank line. Search X-Northpier-Record.

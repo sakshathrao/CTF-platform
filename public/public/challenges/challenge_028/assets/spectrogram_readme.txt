@@ -1,0 +1,1 @@
+WAV: 44.1 kHz mono PCM. Audacity spectrogram: linear scale, 1,000–3,500 Hz, window 8192. Read 7 frequency rows low-to-high and time columns left-to-right. Bright 5×7 cells spell a direction word. Combine it with the site name from the case brief.

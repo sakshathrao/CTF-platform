@@ -1,0 +1,28 @@
+{
+  "id": 3,
+  "title": "The Unseen Build",
+  "category": "Web",
+  "difficulty": "Easy",
+  "points": 100,
+  "inspiration": {
+    "challenge": "Insp3ct0r",
+    "platform": "picoCTF 2019",
+    "references": [
+      "https://play.picoctf.org/practice/challenge/18",
+      "https://github.com/Cajac/picoCTF-Writeups/blob/main/picoCTF_2019/Web_Exploitation/Insp3ct0r.md"
+    ]
+  },
+  "type": "static_web_snapshot",
+  "requires_internet": false,
+  "flag_format": "CTF{...}",
+  "platform": {
+    "challenge_id": 3,
+    "link": "/challenges/web_001/index.html",
+    "submission_endpoint": "POST /solve"
+  },
+  "hints": [
+    "The visible page is only what the browser renders. Inspect the original response sent by the server.",
+    "The page links to a separate stylesheet and a JavaScript file. Open those files directly.",
+    "Look for developer comments in all three source files. Join the three segments in order."
+  ]
+}

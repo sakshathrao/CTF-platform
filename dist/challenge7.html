@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Challenge 7</title>
+<style>@import "https://fonts.googleapis.com/css2?family=Jost:ital,wght@0,100..900;1,100..900&display=swap";:root{--bg-fallback:#090d14;--glass-bg:#0d151ed6;--glass-card:#ffffff0d;--glass-card-hover:#ffffff1a;--glass-subtle:#ffffff09;--ink:#e5e7eb;--muted:#9ca3af;--accent:#779399;--accent-bright:#a5c4ca;--line:#ffffff29;--danger:#f87171;--success:#4ade80}*{box-sizing:border-box}body{min-height:100vh;color:var(--ink);background-color:var(--bg-fallback);background-image:url(/assets/file_00000000bd7c81f4aafde805674aabef_upscayl_2x_upscayl-standard-4x.png);background-position:50%;background-repeat:no-repeat;background-size:cover;background-attachment:fixed;margin:0;padding:110px 20px 60px;font-family:Jost,system-ui,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif}#closedView{flex-direction:column;justify-content:center;align-items:flex-start;min-height:calc(100vh - 96px);padding-left:6%;display:none}main,.shell,.case-shell{border:1px solid var(--line);-webkit-backdrop-filter:blur(16px)saturate(260%)brightness(.75);background:linear-gradient(#0d151edb 0%,#0a1018eb 100%);border-radius:15px;width:min(1020px,100%);max-width:1020px;margin:0 auto;padding:36px clamp(22px,5vw,56px) 48px;position:relative;box-shadow:0 24px 60px #000000a6}header,.top,.topline{color:var(--muted);letter-spacing:.14em;text-transform:uppercase;border-bottom:1px solid var(--line);flex-wrap:wrap;justify-content:space-between;align-items:center;gap:16px;padding-bottom:16px;font:500 13px ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,Courier New,monospace;display:flex}header span[style*=float]{float:none!important}.back-link{color:var(--ink);letter-spacing:.02em;text-transform:none;background:#ffffff14;border:1px solid #fff3;border-radius:8px;padding:6px 14px;font-family:Jost,sans-serif;font-size:14px;font-weight:500;text-decoration:none;transition:background .15s,transform .15s}.back-link:hover{background:#ffffff29;transform:translateY(-1px)}h1,.case-title{all:unset;letter-spacing:-1.5px;background:linear-gradient(181deg,#e5e7eb 30%,#9ca3af,#779399 75%);color:#0000;-webkit-background-clip:text;background-clip:text;margin:24px 0 6px;font-family:Jost,sans-serif;font-size:clamp(34px,5vw,54px);font-weight:400;line-height:1.08;display:block}small,.sub,.case-subtitle{color:var(--accent-bright);letter-spacing:.16em;text-transform:uppercase;margin:0;font:500 13px ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,Courier New,monospace;display:block}.meta{border:1px solid var(--line);background:var(--glass-subtle);border-radius:10px;grid-template-columns:1fr 1fr;gap:16px;margin:24px 0 28px;padding:15px 18px;display:grid}.label,.meta-label,.section,.section-label,.kicker,.file-tag{text-transform:uppercase;letter-spacing:.18em;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,Courier New,monospace}.label,.meta-label{color:var(--muted);margin-bottom:5px;font-size:11px;font-weight:600}.value,.meta-value{color:#fff;font:600 15px Jost,sans-serif}.section,.section-label{color:var(--accent-bright);margin:28px 0 12px;font-size:12px;font-weight:700}p{color:var(--ink);margin:0 0 14px;font-size:17px;line-height:1.65}.brief{max-width:880px}.quote{border-left:3px solid var(--accent-bright);color:#fff;background:#77939924;border-radius:0 8px 8px 0;margin:18px 0 22px;padding:14px 18px;font-size:18px;font-style:italic}.box,.objective{background:#7793991f;border:1px solid #a5c4ca4d;border-radius:10px;margin:20px 0;padding:16px 18px;font-size:17px;line-height:1.6}.box b,.box strong,.objective strong{color:#fff}.handouts{margin-top:12px}.handout{background:var(--glass-card);border:1px solid var(--line);min-height:68px;color:var(--ink);border-radius:10px;grid-template-columns:84px 1fr auto;align-items:center;margin:10px 0;text-decoration:none;transition:background .15s,border-color .15s,transform .15s;display:grid;overflow:hidden}.item{background:var(--glass-card);border:1px solid var(--line);color:#fff;overflow-wrap:anywhere;border-radius:10px;justify-content:space-between;align-items:center;gap:16px;margin:10px 0;padding:16px 20px;text-decoration:none;transition:background .15s,border-color .15s,transform .15s;display:flex}.handout:hover,.item:hover{background:var(--glass-card-hover);border-color:#ffffff52;transform:translateY(-1px)}.item b{color:#fff;font-size:16px;font-weight:600}.item span{color:var(--accent-bright);letter-spacing:.12em;white-space:nowrap;font:700 12px ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,Courier New,monospace}.tag,.handout-id{text-align:center;border-right:1px solid var(--line);color:#fff;letter-spacing:.1em;background:#77939940;align-self:stretch;place-items:center;height:100%;min-height:68px;font:700 13px ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,Courier New,monospace;display:grid}.copy,.handout-copy{padding:12px 16px}.name,.handout-name{color:#fff;font-size:16px;font-weight:600}.hint,.handout-hint{color:var(--muted);margin-top:4px;font:12px ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,Courier New,monospace}.open{color:var(--accent-bright);letter-spacing:.12em;padding:0 18px;font:700 12px ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,Courier New,monospace}.exhibit{background:var(--glass-subtle);border:1px solid var(--line);border-radius:10px;margin:18px 0;padding:15px}.exhibit img{object-fit:contain;background:#00000059;border-radius:6px;width:100%;max-height:650px;display:block}.caption{color:var(--muted);margin-top:10px;font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,Courier New,monospace}ol,.steps{color:var(--ink);padding-left:24px;font-size:17px;line-height:1.7}code{color:#fff;background:#ffffff1a;border-radius:4px;padding:2px 6px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,Courier New,monospace;font-size:.92em}.tool{color:#111;letter-spacing:.04em;background:#e5e7eb;border-radius:8px;margin:6px 8px 6px 0;padding:9px 16px;font:600 13px Jost,sans-serif;text-decoration:none;transition:background .15s,transform .15s;display:inline-block}.tool:hover{background:#fff;transform:translateY(-1px)}.flag-area{margin-top:16px}form,.flag-form{grid-template-columns:1fr auto;align-items:center;gap:12px;display:grid}form input,.flag-form input{all:unset;box-sizing:border-box;color:#fff;background:#ffffff14;border:1px solid #ffffff40;border-radius:6px;width:100%;height:44px;padding:0 14px;font-family:Jost,sans-serif;font-size:16px;transition:border-color .2s,background .2s}form input:focus,.flag-form input:focus{background:#ffffff1f;border-color:#fff9}form input:disabled,.flag-form input:disabled{opacity:.55}form button,.flag-form button{all:unset;box-sizing:border-box;color:#111;cursor:pointer;text-align:center;background:#fff;border-radius:8px;height:44px;padding:0 26px;font-family:Jost,sans-serif;font-size:16px;font-weight:500;transition:transform .15s,background .15s,opacity .15s}form button:hover:not(:disabled),.flag-form button:hover:not(:disabled){background:#e5e7eb;transform:translateY(-1px)}form button:disabled,.flag-form button:disabled{opacity:.5;cursor:not-allowed}.status{min-height:24px;color:var(--danger);margin-top:12px;font:500 14px Jost,sans-serif}.status.ok{color:var(--success)}footer,.foot,.footer{border-top:1px solid var(--line);color:var(--muted);margin-top:32px;padding-top:14px;font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,Courier New,monospace}@media (width<=640px){body{padding:16px 10px 40px}main,.shell,.case-shell{padding:24px 16px 36px}.meta{grid-template-columns:1fr}.handout{grid-template-columns:64px 1fr auto}.item{flex-direction:column;align-items:flex-start}.copy,.handout-copy{padding:10px}.open{padding:0 10px;font-size:11px}p{font-size:16px}form,.flag-form{grid-template-columns:1fr}}</style>  <link rel="stylesheet" crossorigin href="/assets/main-DuwiPGc2.css">
+</head><body>
+
+  <header id="ctfNavbar" class="navbar" style="display: none;">
+    <div class="navLeft">
+      <a href="/main.html" class="navHomeLink">
+        <span class="navBrand">CTF</span>
+        <span class="navDivider">/</span>
+        <span class="navTeamLabel">TEAM</span>
+        <span class="navTeamName" id="navTeamName"></span>
+      </a>
+    </div>
+    <nav>
+      <a href="/main.html" class="navLink">Challenges</a>
+      <a href="/leaderboard.html" class="navLink">Leaderboard</a>
+      <div class="navPoints">
+        <span class="pointsLabel">Points:</span>
+        <span class="pointsValue" id="navPoints">0</span>
+      </div>
+      <button type="button" id="logoutBtn" class="navLogoutBtn">Logout</button>
+    </nav>
+  </header>
+
+<div id="closedView" class="main_bg start">
+  <h1small>This form isn't accepting <br> responses right now.</h1small>
+</div>
+<main class="shell">
+<div class="top"><span>LINUX SYSTEMS REVIEW / EVIDENCE ARCHIVE</span><span>CASE LX-07</span><a class="back-link" href="/main.html">← Back to Challenges</a></div>
+<h1>The Hidden Handover</h1><div class="sub">FILESYSTEM INVESTIGATION / DOTFILE RECOVERY</div>
+<div class="meta"><div><div class="label">FILED BY</div><div class="value">Systems Review Unit</div></div><div><div class="label">STATUS</div><div class="value">OPEN</div></div></div>
+<div class="section">CASE BRIEF</div>
+<p>A Linux file server used by the North Pier dispatch team was copied during an equipment audit. The active handover record was missing from the previous examiner's visible directory listing.</p>
+<p>The examiner's notes indicate that the handover was saved beneath <code>dispatch/active</code>, inside a dot-prefixed directory, and that the note itself also used a hidden filename.</p>
+<div class="box"><p style="margin:0"><strong>OBJECTIVE</strong><br>Extract the workspace archive, locate the hidden handover note and recover its recovery marker.</p></div>
+<div class="section">HANDOUTS</div>
+<a class="handout" href="/challenges/linux_001/assets/recovered_workspace.zip" download><span class="tag">EXHIBIT<br>A</span><span class="copy"><span class="name">Recovered Linux workspace</span><br><span class="hint">ZIP · NESTED DIRECTORY TREE</span></span><span class="open">DOWNLOAD ↗</span></a>
+<a class="handout" href="/challenges/linux_001/assets/case_note.txt" download><span class="tag">EXHIBIT<br>B</span><span class="copy"><span class="name">Case note</span><br><span class="hint">TXT · STARTING LEAD</span></span><span class="open">OPEN ↗</span></a>
+<a class="handout" href="/challenges/linux_001/assets/intake_report.txt" download><span class="tag">EXHIBIT<br>C</span><span class="copy"><span class="name">Workspace intake report</span><br><span class="hint">TXT · INITIAL TRIAGE</span></span><span class="open">OPEN ↗</span></a>
+<a class="handout" href="/challenges/linux_001/assets/exhibits_LX07.zip" download><span class="tag">PACK<br>A–C</span><span class="copy"><span class="name">Complete evidence bundle</span><br><span class="hint">ZIP · ALL HANDOUTS</span></span><span class="open">DOWNLOAD ↗</span></a>
+<div class="section">INVESTIGATION STEPS</div>
+<ol><li>Extract <code>recovered_workspace.zip</code>.</li><li>Navigate to <code>recovered_workspace/dispatch/active</code>.</li><li>Use <code>ls -la</code> to include dot-prefixed directories and files.</li><li>Inspect the hidden handover directory and read the hidden note with <code>cat</code>.</li></ol>
+<div class="section">SUBMIT FLAG</div>
+<form id="flagForm"><input id="flagInput" placeholder="CTF{...}" autocomplete="off" spellcheck="false" required><button id="submitButton" type="submit">SUBMIT</button></form>
+<div class="status" id="result" role="status" aria-live="polite"></div>
+<div class="foot">STATIC LINUX FUNDAMENTALS CASE / ALL FILESYSTEM EVIDENCE IS INCLUDED LOCALLY.</div>
+</main>
+<script>
+"use strict";
+
+const CHALLENGE_ID = 7;
+const challengeID = 7;
+const DEFAULT_POINTS = 100;
+const isDev = location.port === "5173" || location.port === "5174";
+const apiBase = isDev ? `http://${location.hostname}:3001` : "";
+const wsProtocol = location.protocol === "https:" ? "wss:" : "ws:";
+const wsHost = isDev ? `${location.hostname}:3001` : location.host;
+
+let eventStarted = false;
+let solved = false;
+
+function getElements() {
+  return {
+    shell: document.querySelector(".shell, .case-shell, main"),
+    closed: document.getElementById("closedView"),
+    form: document.getElementById("flagForm") || document.getElementById("f") || document.querySelector("form"),
+    input: document.getElementById("flagInput") || document.getElementById("flag") || document.querySelector("form input"),
+    button: document.getElementById("submitButton") || document.querySelector("form button"),
+    status: document.getElementById("result") || document.getElementById("s") || document.querySelector(".status"),
+  };
+}
+
+function getProgressCookie() {
+  for (const cookie of document.cookie.split(";")) {
+    const [key, ...value] = cookie.trim().split("=");
+    if (key === "ctf_progress") {
+      try {
+        return JSON.parse(decodeURIComponent(value.join("=")));
+      } catch {
+        return null;
+      }
+    }
+  }
+  return null;
+}
+
+async function getJSON(path) {
+  const response = await fetch(`${apiBase}${path}`, { credentials: "include" });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  return response.json();
+}
+
+function applySolvedState(msg) {
+  solved = true;
+  const { input, button, status } = getElements();
+  if (input) input.disabled = true;
+  if (button) button.disabled = true;
+  if (status) {
+    status.classList.add("ok");
+    status.textContent = msg || "YOUR TEAM HAS ALREADY SOLVED THIS CASE.";
+  }
+}
+
+function renderEventState(state) {
+  const { shell, closed, button, status } = getElements();
+  eventStarted = Boolean(state && state.layout === "start");
+
+  if (state && typeof state.timerEnd === "number" && Date.now() >= state.timerEnd) {
+    eventStarted = false;
+  }
+
+  if (!eventStarted) {
+    if (shell) shell.style.display = "none";
+    if (closed) closed.style.display = "flex";
+    if (button && !solved) button.disabled = true;
+  } else {
+    if (closed) closed.style.display = "none";
+    if (shell) shell.style.display = "block";
+    if (!solved) {
+      if (button) button.disabled = false;
+      if (status && (status.textContent === "EVENT NOT STARTED." || status.textContent === "EVENT ENDED.")) {
+        status.textContent = "";
+      }
+    }
+  }
+}
+
+async function submitFlag(event) {
+  event.preventDefault();
+  const { input, button, status } = getElements();
+  const flag = input ? input.value.trim() : "";
+
+  if (!eventStarted) {
+    if (status) {
+      status.classList.remove("ok");
+      status.textContent = "EVENT NOT CURRENTLY ACCEPTING SUBMISSIONS.";
+    }
+    return;
+  }
+  if (!flag) return;
+
+  if (button) button.disabled = true;
+  if (status) {
+    status.classList.remove("ok");
+    status.textContent = "VERIFYING…";
+  }
+
+  try {
+    const response = await fetch(`${apiBase}/solve`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ challengeId: CHALLENGE_ID, flag }),
+    });
+    const data = await response.json().catch(() => ({}));
+
+    if (response.ok && data.success) {
+      const pts = data.totalPoints ?? data.pointsAwarded ?? DEFAULT_POINTS;
+      const pointsEl = document.getElementById("navPoints");
+      if (pointsEl && typeof data.totalPoints === "number") {
+        pointsEl.textContent = data.totalPoints;
+      }
+      try {
+        const bc = new BroadcastChannel("ctf_progress");
+        bc.postMessage({ type: "progress", points: data.totalPoints, solved: [CHALLENGE_ID] });
+        bc.close();
+      } catch {}
+      applySolvedState(`CASE CLOSED — +${data.pointsAwarded ?? DEFAULT_POINTS} POINTS`);
+      return;
+    }
+    if (response.status === 401) {
+      location.replace("/login.html");
+      return;
+    }
+    if (response.status === 409) {
+      applySolvedState("YOUR TEAM HAS ALREADY SOLVED THIS CASE.");
+      return;
+    }
+    if (status) status.textContent = data.error || "INCORRECT FLAG — PLEASE TRY AGAIN.";
+    if (button) button.disabled = false;
+  } catch (err) {
+    console.error(err);
+    if (status) status.textContent = "SERVER CONNECTION FAILED — PLEASE TRY AGAIN.";
+    if (button) button.disabled = false;
+  }
+}
+
+function connectSocket() {
+  const ws = new WebSocket(`${wsProtocol}//${wsHost}`);
+
+  ws.addEventListener("message", (event) => {
+    try {
+      const state = JSON.parse(event.data);
+      if (state && state.type === "progress") {
+        const pointsEl = document.getElementById("navPoints");
+        if (pointsEl && typeof state.points === "number") {
+          pointsEl.textContent = state.points;
+        }
+        if (Array.isArray(state.solved) && state.solved.includes(CHALLENGE_ID)) {
+          applySolvedState("YOUR TEAM HAS ALREADY SOLVED THIS CASE.");
+        }
+        return;
+      }
+      renderEventState(state);
+    } catch (err) {
+      console.error("Invalid event state:", err);
+    }
+  });
+
+  ws.addEventListener("close", () => {
+    setTimeout(connectSocket, 2500);
+  });
+}
+
+async function checkSession() {
+  try {
+    const res = await fetch(`${apiBase}/session`, { credentials: "include" });
+    if (!res.ok) {
+      location.replace("/login.html");
+      return false;
+    }
+    const data = await res.json();
+    const nav = document.getElementById("ctfNavbar");
+    if (nav) {
+      const teamEl = document.getElementById("navTeamName");
+      const pointsEl = document.getElementById("navPoints");
+      if (teamEl) teamEl.textContent = data.teamName || "";
+      if (pointsEl) pointsEl.textContent = data.points ?? 0;
+      nav.style.display = "flex";
+    }
+    const logoutBtn = document.getElementById("logoutBtn");
+    if (logoutBtn) {
+      logoutBtn.onclick = async () => {
+        logoutBtn.disabled = true;
+        try {
+          const bc = new BroadcastChannel("ctf_progress");
+          bc.postMessage({ type: "auth_change", loggedIn: false });
+          bc.close();
+        } catch {}
+        try {
+          await fetch(`${apiBase}/logout`, { method: "POST", credentials: "include" });
+        } catch {}
+        document.cookie = "session=; Max-Age=0; path=/;";
+        document.cookie = "ctf_progress=; Max-Age=0; path=/;";
+        location.replace("/login.html");
+      };
+    }
+    return true;
+  } catch {
+    location.replace("/login.html");
+    return false;
+  }
+}
+
+async function init() {
+  const authed = await checkSession();
+  if (!authed) return;
+
+  const cookieProgress = getProgressCookie();
+  if (cookieProgress && Array.isArray(cookieProgress.solved) && cookieProgress.solved.includes(CHALLENGE_ID)) {
+    solved = true;
+  }
+  try {
+    const progress = await getJSON("/progress");
+    if (progress) {
+      const pointsEl = document.getElementById("navPoints");
+      if (pointsEl && typeof progress.points === "number") {
+        pointsEl.textContent = progress.points;
+      }
+      if (Array.isArray(progress.solved) && progress.solved.includes(CHALLENGE_ID)) {
+        solved = true;
+      }
+    }
+  } catch {}
+
+  const { form } = getElements();
+  if (form) form.addEventListener("submit", submitFlag);
+
+  if (solved) {
+    applySolvedState("YOUR TEAM HAS ALREADY SOLVED THIS CASE.");
+  }
+
+  try {
+    const initialState = await getJSON("/state");
+    renderEventState(initialState);
+  } catch {}
+
+  connectSocket();
+
+  try {
+    const bc = new BroadcastChannel("ctf_progress");
+    bc.onmessage = (event) => {
+      if (event.data && event.data.type === "auth_change" && !event.data.loggedIn) {
+        location.replace("/login.html");
+        return;
+      }
+      if (event.data && typeof event.data.points === "number") {
+        const pointsEl = document.getElementById("navPoints");
+        if (pointsEl) pointsEl.textContent = event.data.points;
+      }
+      if (event.data && Array.isArray(event.data.solved) && event.data.solved.includes(CHALLENGE_ID)) {
+        applySolvedState("YOUR TEAM HAS ALREADY SOLVED THIS CASE.");
+      }
+    };
+  } catch {}
+}
+
+init();
+</script></body></html>

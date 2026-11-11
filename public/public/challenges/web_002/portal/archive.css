@@ -1,0 +1,37 @@
+*{box-sizing:border-box}
+:root{--navy:#182d40;--blue:#294d68;--paper:#f3f6f8;--ink:#1d2c38;--muted:#71818d;--line:#d9e1e6;--rust:#a85e3c;--green:#6b997d}
+body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.55 Inter,"Segoe UI",Arial,sans-serif}
+.masthead{height:78px;background:var(--navy);color:#fff;display:flex;align-items:center;padding:0 max(5vw,22px);gap:13px}
+.seal{width:42px;height:42px;border:1px solid #8399a9;border-radius:50%;display:grid;place-items:center;font:700 12px Georgia,serif;letter-spacing:.06em}
+.identity{display:flex;flex-direction:column;line-height:1.2}
+.identity strong{font-size:12px;letter-spacing:.16em}
+.identity span{font-size:9px;letter-spacing:.13em;color:#afc0cc;margin-top:5px}
+.mirror-status{margin-left:auto;border:1px solid #536c7e;border-radius:30px;padding:7px 12px;color:#d8e3e9;font:9px "Courier New",monospace;letter-spacing:.13em}
+.mirror-status i{display:inline-block;width:7px;height:7px;background:#85c5a1;border-radius:50%;margin-right:7px}
+.frame{width:min(940px,90vw);margin:0 auto}
+.crumb{border-bottom:1px solid var(--line);padding:16px 0;color:#71818d;font:10px "Courier New",monospace;letter-spacing:.12em}
+.crumb span{padding:0 9px;color:var(--rust)}
+.intro{padding:54px 0 35px}
+.eyebrow{margin:0 0 10px;color:var(--rust);font:700 10px "Courier New",monospace;letter-spacing:.18em}
+h1{font:500 clamp(40px,6vw,62px)/1.02 Georgia,serif;letter-spacing:-.04em;margin:0}
+h1 em{color:var(--blue);font-weight:400}
+.lead{color:var(--muted);font-size:15px;max-width:610px;margin:18px 0 0}
+.lookup-panel{background:#fff;border:1px solid var(--line);box-shadow:0 12px 35px #1b30400a}
+.panel-head{display:flex;justify-content:space-between;align-items:center;padding:22px 25px 16px;border-bottom:1px solid var(--line)}
+.panel-head .eyebrow{margin-bottom:5px}
+h2{font:500 25px Georgia,serif;margin:0}
+.read-only{color:var(--blue);border:1px solid #c9d5dd;padding:5px 9px;font:9px "Courier New",monospace;letter-spacing:.15em}
+.helper{font-size:12px;color:var(--muted);padding:0 25px;margin:14px 0}
+.record{min-height:190px;margin:0 25px 20px;border:1px solid #e4e9ed;background:#f8fafb;padding:22px 24px}
+.record-number{font:10px "Courier New",monospace;color:var(--rust);letter-spacing:.15em}
+.record h3{font:500 24px Georgia,serif;margin:9px 0}
+.record p{color:#5e6f7c;margin:0;max-width:640px}
+.record .badge{display:inline-block;margin-top:16px;background:#e7f0eb;color:#47715a;padding:4px 8px;font:9px "Courier New",monospace;letter-spacing:.12em}
+.record .restricted{background:#f6e8e2;color:#944b32}
+.panel-foot{display:flex;justify-content:space-between;gap:12px;border-top:1px solid var(--line);padding:13px 25px;color:var(--muted);font:9px "Courier New",monospace;letter-spacing:.09em}
+.panel-foot b{color:var(--blue)}
+.help{display:flex;gap:12px;margin:20px 0 55px;padding:15px 18px;background:#e9eff2;border-left:3px solid #aebdc7}
+.help-mark{width:20px;height:20px;flex:none;border-radius:50%;background:#d7e0e5;color:#496273;display:grid;place-items:center;font:700 12px Georgia,serif}
+.help strong{font-size:12px}.help p{font-size:12px;color:var(--muted);margin:3px 0 0}
+footer{background:var(--navy);padding:18px max(5vw,22px);display:flex;justify-content:space-between;gap:10px;color:#aebec9;font:9px "Courier New",monospace;letter-spacing:.12em}
+@media(max-width:620px){.frame{width:90vw}.intro{padding:40px 0 28px}.panel-head{padding:18px}.helper{padding:0 18px}.record{margin:0 18px 18px;padding:18px}.panel-foot{padding:12px 18px;flex-direction:column}.mirror-status{font-size:8px}footer{flex-direction:column}}

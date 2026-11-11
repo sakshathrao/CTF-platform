@@ -1,0 +1,29 @@
+CHALLENGE 009 — TOOL QUICKSTART
+THE SEALED HANDOVER / METADATA + APPENDED ZIP
+
+Kali Linux / Ubuntu / WSL2
+--------------------------
+1. Identify the image and inspect its metadata:
+   file archive_photo.jpg
+   exiftool -UserComment archive_photo.jpg
+2. Decode the UserComment value (replace VALUE with the actual metadata text):
+   printf '%s' 'VALUE' | base64 -d
+   This output is the archive password, not the final flag.
+3. Identify the appended ZIP:
+   binwalk archive_photo.jpg
+4. Try direct extraction with the recovered password:
+   unzip -P 'RECOVERED_PASSWORD' archive_photo.jpg
+   Some Info-ZIP versions warn that non-ZIP bytes precede the archive. If direct extraction
+   fails, use the ZIP offset reported by Binwalk to carve the ZIP segment, then:
+   unzip -P 'RECOVERED_PASSWORD' carved_payload.zip
+5. Read `handover_note.txt`.
+
+Windows
+-------
+Use WSL2/Kali with the commands above, or combine:
+- ExifTool for Windows: https://exiftool.org/
+- 7-Zip: https://www.7-zip.org/
+If the archive is appended to the JPEG, first carve the ZIP segment using a file-offset
+tool, then open the carved ZIP with 7-Zip and enter the Base64-decoded password.
+
+The case evidence is local. Internet-based EXIF and Base64 tools are optional.

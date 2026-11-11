@@ -1,0 +1,31 @@
+CASE FILE: FR-11
+UNIT: DIGITAL FORENSICS / BROWSER ARTIFACT REVIEW
+STATUS: OPEN
+
+A workstation assigned to the North Pier archive desk was returned during an internal audit. The user account has been identified as "operator".
+
+The audit team knows that a file named:
+
+    northpier_manifest.csv
+
+was downloaded shortly before the workstation was shut down. The original source of the download was not recorded in the asset handover.
+
+Investigators recovered the browser's Chromium History database from the user's profile. It contains browsing records and download metadata.
+
+OBJECTIVE
+Use the browser history database to identify:
+1. The exact page URL from which northpier_manifest.csv was downloaded.
+2. The UTC date and time at which that download started.
+
+Combine the source hostname and timestamp using the flag format shown below.
+
+FLAG NORMALIZATION
+- Hostname only, without scheme or path.
+- Lowercase.
+- Timestamp format: YYYYMMDD_HHMM in UTC.
+- Join hostname and timestamp with an underscore.
+
+Expected format:
+CTF{hostname_YYYYMMDD_HHMM}
+
+All required data is contained in the supplied database. No external access to the recorded addresses is necessary.

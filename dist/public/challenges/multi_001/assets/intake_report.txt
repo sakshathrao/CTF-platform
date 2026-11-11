@@ -1,0 +1,19 @@
+MULTI-STAGE EVIDENCE INTAKE
+Evidence ID: MS-09-A
+Filename: archive_photo.jpg
+Visible type: JPEG image
+Acquisition: North Pier archive export
+Preview: Opens normally
+File size: Larger than expected
+
+Initial examiner observations:
+1. EXIF metadata is present.
+2. The UserComment field contains a Base64-looking value.
+3. A file-structure scan suggests another archive may follow the JPEG end marker.
+4. The embedded archive is password protected.
+
+Suggested examination order:
+- Read the UserComment metadata.
+- Decode the Base64 value to recover the archive password.
+- Locate and extract the appended ZIP.
+- Read the handover note inside.

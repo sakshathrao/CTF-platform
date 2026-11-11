@@ -68,7 +68,11 @@ test("Database: schema, teams, and challenges are intact", () => {
 
   const ch1 = db.prepare("SELECT * FROM challenges WHERE id = 1").get();
   assert.ok(ch1, "Challenge 1 exists");
-  assert.equal(ch1.flag, "12345-67890", "Challenge 1 flag is preserved");
+  assert.equal(ch1.flag, "CTF{c2005_16_20}", "Challenge 1 flag is preserved");
+  assert.equal(ch1.category, "OSINT", "Challenge 1 category is OSINT");
+
+  const count = db.prepare("SELECT COUNT(*) as cnt FROM challenges").get().cnt;
+  assert.ok(count >= 31, "All 31 challenges seeded in database");
 });
 
 test("HTTP: /session rejects unauthenticated requests", async () => {
@@ -458,25 +462,25 @@ test("Challenges: each challenge has a category and serial unlocking works per c
     assert.equal(visibleInCat[0].id, catChallenges[0].id, `Category ${cat} shows its first challenge in serial order`);
   }
 
-  // Solve challenge 1 (from Web category)
+  // Solve challenge 1 (from OSINT category)
   const afterSolve1 = getVisibleChallenges(challenges, new Set([1]));
-  const webVisible = afterSolve1.filter(c => c.category === "Web");
-  assert.equal(webVisible.length, 2, "Web category shows an additional challenge after solving 1");
-  assert.equal(webVisible[0].id, 1);
-  assert.equal(webVisible[1].id, 2);
+  const osintVisible = afterSolve1.filter(c => c.category === "OSINT");
+  assert.equal(osintVisible.length, 2, "OSINT category shows an additional challenge after solving 1");
+  assert.equal(osintVisible[0].id, 1);
+  assert.equal(osintVisible[1].id, 13);
 
   // Other categories must still show only 1 challenge
-  for (const cat of categories.filter(c => c !== "Web")) {
+  for (const cat of categories.filter(c => c !== "OSINT")) {
     const visibleInCat = afterSolve1.filter(c => c.category === cat);
     assert.equal(visibleInCat.length, 1, `Category ${cat} is untouched and still shows only 1 challenge`);
   }
 
-  // Solve challenge 3 (from Crypto category) as well
+  // Solve challenge 3 (from Web category) as well
   const afterSolve1And3 = getVisibleChallenges(challenges, new Set([1, 3]));
-  const cryptoVisible = afterSolve1And3.filter(c => c.category === "Crypto");
-  assert.equal(cryptoVisible.length, 2, "Crypto category shows an additional challenge after solving 3");
-  assert.equal(cryptoVisible[0].id, 3);
-  assert.equal(cryptoVisible[1].id, 4);
+  const webVisible = afterSolve1And3.filter(c => c.category === "Web");
+  assert.equal(webVisible.length, 2, "Web category shows an additional challenge after solving 3");
+  assert.equal(webVisible[0].id, 3);
+  assert.equal(webVisible[1].id, 10);
 
   // Forensics should still show only 1
   const forensicsVisible = afterSolve1And3.filter(c => c.category === "Forensics");
@@ -484,7 +488,11 @@ test("Challenges: each challenge has a category and serial unlocking works per c
 
   // Verify DB category sync
   const dbCh1 = db.prepare("SELECT category FROM challenges WHERE id = 1").get();
-  assert.equal(dbCh1.category, "Web", "DB challenge category is synced");
+  assert.equal(dbCh1.category, "OSINT", "DB challenge category is synced");
+  const dbCh2 = db.prepare("SELECT category FROM challenges WHERE id = 2").get();
+  assert.equal(dbCh2.category, "Forensics", "DB challenge 2 category is Forensics");
+  const dbCh3 = db.prepare("SELECT category FROM challenges WHERE id = 3").get();
+  assert.equal(dbCh3.category, "Web", "DB challenge 3 category is Web");
 });
 
 test("HTTP: /logout properly deauthenticates session in database and clears cookies", async () => {
@@ -543,12 +551,12 @@ test("HTTP: /logout properly deauthenticates session in database and clears cook
   assert.equal(db.prepare("SELECT * FROM sessions WHERE token = ?").get(testToken2), undefined);
 });
 
-test("Challenges: challenge2.html through challenge6.html exist and serve with correct challenge IDs", async () => {
-  for (let id = 2; id <= 6; id++) {
+test("Challenges: challenge1.html through challenge31.html exist and serve with correct challenge IDs", async () => {
+  for (let id = 1; id <= 31; id++) {
     const res = await makeRequest("GET", `/challenge${id}.html`);
     assert.equal(res.statusCode, 200, `challenge${id}.html returns 200`);
     assert.match(res.body, new RegExp(`<title>Challenge ${id}</title>`), `challenge${id}.html has correct title`);
-    assert.match(res.body, new RegExp(`const challengeID = ${id};`), `challenge${id}.html targets challenge ID ${id}`);
+    assert.match(res.body, new RegExp(`challengeID = ${id};|CHALLENGE_ID = ${id};`), `challenge${id}.html targets challenge ID ${id}`);
     assert.match(res.body, /id="navPoints"/, `challenge${id}.html has navPoints element`);
     assert.match(res.body, /BroadcastChannel\("ctf_progress"\)/, `challenge${id}.html has instant score sync`);
   }
@@ -747,39 +755,40 @@ test("Security & Flow: locked challenges cannot be solved out of order (403 Forb
     const ch1 = db.prepare("SELECT flag FROM challenges WHERE id = 1").get();
     const ch2 = db.prepare("SELECT flag FROM challenges WHERE id = 2").get();
     const ch4 = db.prepare("SELECT flag FROM challenges WHERE id = 4").get();
+    const ch10 = db.prepare("SELECT flag FROM challenges WHERE id = 10").get();
 
-    // Attempt to solve challenge 2 (Web category) without solving challenge 1
-    const resSolve2 = await makeRequest("POST", "/solve", {
-      "Content-Type": "application/json",
-      Cookie: `session=${testToken}`
-    }, { challengeId: 2, flag: ch2.flag });
-
-    assert.equal(resSolve2.statusCode, 403, "Challenge 2 is locked before Challenge 1 is solved");
-    assert.match(JSON.parse(resSolve2.body).error, /locked/i);
-
-    // Attempt to solve challenge 4 (Crypto category) without solving challenge 3
+    // Attempt to solve challenge 4 (Forensics category #2) without solving challenge 2 (Forensics #1)
     const resSolve4 = await makeRequest("POST", "/solve", {
       "Content-Type": "application/json",
       Cookie: `session=${testToken}`
     }, { challengeId: 4, flag: ch4.flag });
 
-    assert.equal(resSolve4.statusCode, 403, "Challenge 4 is locked before Challenge 3 is solved");
+    assert.equal(resSolve4.statusCode, 403, "Challenge 4 is locked before Challenge 2 is solved");
+    assert.match(JSON.parse(resSolve4.body).error, /locked/i);
 
-    // Now solve challenge 1 (initial Web challenge)
-    const resSolve1 = await makeRequest("POST", "/solve", {
+    // Attempt to solve challenge 10 (Web category #2) without solving challenge 3 (Web #1)
+    const resSolve10 = await makeRequest("POST", "/solve", {
       "Content-Type": "application/json",
       Cookie: `session=${testToken}`
-    }, { challengeId: 1, flag: ch1.flag });
+    }, { challengeId: 10, flag: ch10.flag });
 
-    assert.equal(resSolve1.statusCode, 200, "Challenge 1 succeeds");
+    assert.equal(resSolve10.statusCode, 403, "Challenge 10 is locked before Challenge 3 is solved");
 
-    // Now challenge 2 is unlocked and can be solved
-    const resSolve2After = await makeRequest("POST", "/solve", {
+    // Now solve challenge 2 (initial Forensics challenge)
+    const resSolve2 = await makeRequest("POST", "/solve", {
       "Content-Type": "application/json",
       Cookie: `session=${testToken}`
     }, { challengeId: 2, flag: ch2.flag });
 
-    assert.equal(resSolve2After.statusCode, 200, "Challenge 2 now succeeds after Challenge 1 is solved");
+    assert.equal(resSolve2.statusCode, 200, "Challenge 2 succeeds");
+
+    // Now challenge 4 is unlocked and can be solved
+    const resSolve4After = await makeRequest("POST", "/solve", {
+      "Content-Type": "application/json",
+      Cookie: `session=${testToken}`
+    }, { challengeId: 4, flag: ch4.flag });
+
+    assert.equal(resSolve4After.statusCode, 200, "Challenge 4 now succeeds after Challenge 2 is solved");
   } finally {
     db.prepare("DELETE FROM solves WHERE team_name = ?").run(testTeam);
     db.prepare("DELETE FROM sessions WHERE team_name = ?").run(testTeam);
@@ -1345,6 +1354,136 @@ test("Validation: malformed, invalid or non-existent challenge submissions are s
   } finally {
     db.prepare("DELETE FROM sessions WHERE team_name = ?").run(valTeam);
     db.prepare("DELETE FROM teams WHERE name = ?").run(valTeam);
+    await makeRequest("POST", "/admin/state", {
+      "Content-Type": "application/json",
+      "X-Admin-Token": TEST_ADMIN_TOKEN
+    }, { layout: "wait" });
+  }
+});
+
+test("Challenges 001-031: Static asset serving handles pcaps, zips, pdfs, and text files", async () => {
+  // Test exhibit pack zip
+  const resZip = await makeRequest("GET", "/assets/exhibits_A_to_C.zip");
+  assert.equal(resZip.statusCode, 200, "exhibits_A_to_C.zip is served with 200");
+  assert.match(resZip.headers["content-type"], /application\/zip/i);
+  assert.ok(parseInt(resZip.headers["content-length"], 10) > 100000);
+
+  // Test PCAP file
+  const resPcap = await makeRequest("GET", "/assets/gateway_capture.pcap");
+  assert.equal(resPcap.statusCode, 200, "gateway_capture.pcap is served with 200");
+  assert.match(resPcap.headers["content-type"], /pcap/i);
+
+  // Test case note text
+  const resText = await makeRequest("GET", "/assets/case_note.txt");
+  assert.equal(resText.statusCode, 200, "case_note.txt is served with 200");
+  assert.match(resText.headers["content-type"], /text\/plain/i);
+
+  // Test challenge subfolder asset
+  const resSubNote = await makeRequest("GET", "/challenges/challenge_014/assets/resolver_note.txt");
+  assert.equal(resSubNote.statusCode, 200, "Subfolder resolver_note.txt is served with 200");
+  assert.match(resSubNote.headers["content-type"], /text\/plain/i);
+
+  // Test web_001 portal snapshot
+  const resWebZip = await makeRequest("GET", "/challenges/web_001/portal/portal_snapshot.zip");
+  assert.equal(resWebZip.statusCode, 200, "web_001 portal_snapshot.zip is served with 200");
+  assert.match(resWebZip.headers["content-type"], /application\/zip/i);
+});
+
+test("Challenges 001-031: Clean URL resolution works for challenge pages without .html", async () => {
+  for (const id of [1, 7, 14, 21, 28, 31]) {
+    const res = await makeRequest("GET", `/challenge${id}`);
+    assert.equal(res.statusCode, 200, `/challenge${id} clean URL resolves to 200`);
+    assert.match(res.body, new RegExp(`<title>Challenge ${id}</title>`));
+  }
+});
+
+test("Challenges 001-031: Deep serial category unlocking works across multi-level progression", async () => {
+  const { challenges, getVisibleChallenges } = await import("../challenges.js");
+  const forensicsChallenges = challenges.filter(c => c.category === "Forensics").map(c => c.id);
+  assert.ok(forensicsChallenges.length >= 4, "Forensics has at least 4 challenges");
+
+  // Step 0: Initially only first Forensics challenge is visible
+  let solved = new Set();
+  let visible = getVisibleChallenges(challenges, solved).filter(c => c.category === "Forensics").map(c => c.id);
+  assert.deepEqual(visible, [forensicsChallenges[0]]);
+
+  // Step 1: Solve challenge 2 -> unlocks challenge 4
+  solved.add(forensicsChallenges[0]);
+  visible = getVisibleChallenges(challenges, solved).filter(c => c.category === "Forensics").map(c => c.id);
+  assert.deepEqual(visible, [forensicsChallenges[0], forensicsChallenges[1]]);
+
+  // Step 2: Solve challenge 4 -> unlocks challenge 11
+  solved.add(forensicsChallenges[1]);
+  visible = getVisibleChallenges(challenges, solved).filter(c => c.category === "Forensics").map(c => c.id);
+  assert.deepEqual(visible, [forensicsChallenges[0], forensicsChallenges[1], forensicsChallenges[2]]);
+
+  // Step 3: Solve challenge 11 -> unlocks challenge 17
+  solved.add(forensicsChallenges[2]);
+  visible = getVisibleChallenges(challenges, solved).filter(c => c.category === "Forensics").map(c => c.id);
+  assert.deepEqual(visible, [forensicsChallenges[0], forensicsChallenges[1], forensicsChallenges[2], forensicsChallenges[3]]);
+});
+
+test("Challenges 001-031: Solves across diverse categories correctly award points and update leaderboards", async () => {
+  await makeRequest("POST", "/admin/state", {
+    "Content-Type": "application/json",
+    "X-Admin-Token": TEST_ADMIN_TOKEN
+  }, { layout: "start" });
+
+  const catTeam = "CategoryTeam_" + Date.now();
+  const catToken = "cat_token_" + Date.now();
+
+  try {
+    db.prepare("INSERT INTO teams (name, password_hash, points, member1_name, member1_usn, has_logged_in) VALUES (?, 'h', 0, 'DiverseUser', '1MS21CS999', 1)").run(catTeam);
+    db.prepare("INSERT INTO sessions (token, team_name) VALUES (?, ?)").run(catToken, catTeam);
+
+    // Solve Challenge 6 (Reverse Engineering, 100 base points)
+    const ch6 = db.prepare("SELECT flag FROM challenges WHERE id = 6").get();
+    const res6 = await makeRequest("POST", "/solve", {
+      "Content-Type": "application/json",
+      Cookie: `session=${catToken}`
+    }, { challengeId: 6, flag: ch6.flag });
+    assert.equal(res6.statusCode, 200, "Challenge 6 (Reverse Engineering) solves successfully");
+
+    // Solve Challenge 7 (Linux, 100 base points)
+    const ch7 = db.prepare("SELECT flag FROM challenges WHERE id = 7").get();
+    const res7 = await makeRequest("POST", "/solve", {
+      "Content-Type": "application/json",
+      Cookie: `session=${catToken}`
+    }, { challengeId: 7, flag: ch7.flag });
+    assert.equal(res7.statusCode, 200, "Challenge 7 (Linux) solves successfully");
+
+    // Solve Challenge 8 (Steganography, 100 base points)
+    const ch8 = db.prepare("SELECT flag FROM challenges WHERE id = 8").get();
+    const res8 = await makeRequest("POST", "/solve", {
+      "Content-Type": "application/json",
+      Cookie: `session=${catToken}`
+    }, { challengeId: 8, flag: ch8.flag });
+    assert.equal(res8.statusCode, 200, "Challenge 8 (Steganography) solves successfully");
+
+    // Solve Challenge 14 (Network Analysis, 125 base points)
+    const ch14 = db.prepare("SELECT flag FROM challenges WHERE id = 14").get();
+    const res14 = await makeRequest("POST", "/solve", {
+      "Content-Type": "application/json",
+      Cookie: `session=${catToken}`
+    }, { challengeId: 14, flag: ch14.flag });
+    assert.equal(res14.statusCode, 200, "Challenge 14 (Network Analysis) solves successfully");
+
+    // Verify team points in DB
+    const teamDb = db.prepare("SELECT points FROM teams WHERE name = ?").get(catTeam);
+    assert.ok(teamDb.points > 400, "Total points reflect solves across all 4 categories");
+
+    // Verify leaderboard reflects updated score
+    const resLb = await makeRequest("GET", "/api/leaderboard");
+    assert.equal(resLb.statusCode, 200);
+    const data = JSON.parse(resLb.body);
+    const lb = Array.isArray(data) ? data : data.leaderboard;
+    const entry = lb.find(t => t.name === catTeam);
+    assert.ok(entry, "Team is present on leaderboard");
+    assert.equal(entry.points, teamDb.points, "Leaderboard points match DB points exactly");
+  } finally {
+    db.prepare("DELETE FROM solves WHERE team_name = ?").run(catTeam);
+    db.prepare("DELETE FROM sessions WHERE team_name = ?").run(catTeam);
+    db.prepare("DELETE FROM teams WHERE name = ?").run(catTeam);
     await makeRequest("POST", "/admin/state", {
       "Content-Type": "application/json",
       "X-Admin-Token": TEST_ADMIN_TOKEN

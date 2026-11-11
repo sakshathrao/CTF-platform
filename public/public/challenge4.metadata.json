@@ -1,0 +1,21 @@
+{
+  "id": 4,
+  "title": "A Few Missing Bytes",
+  "category": "Forensics",
+  "difficulty": "Easy",
+  "points": 100,
+  "type": "static_corrupted_file",
+  "requires_internet": false,
+  "deployment": "public/challenge4.html",
+  "asset_directory": "public/challenges/forensics_001/assets/",
+  "flag_format": "CTF{...}",
+  "hints_available": true,
+  "inspiration": {
+    "challenge": "Corrupted file",
+    "platform": "picoMini by CMU-Africa",
+    "references": [
+      "https://github.com/amyy45/CTF-Writeups/blob/main/CTFs/Forensics/corruptedFile.md",
+      "https://github.com/Shaker-maker/ctf-writeups/blob/main/picoctf/forensics/file-corruption.md"
+    ]
+  }
+}

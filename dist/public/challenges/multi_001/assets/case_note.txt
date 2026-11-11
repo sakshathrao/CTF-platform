@@ -1,0 +1,19 @@
+CASE FILE: MS-09
+UNIT: DIGITAL EVIDENCE / ARCHIVE RECOVERY
+STATUS: OPEN
+
+An inspection photograph was recovered from the North Pier archive desk. The photograph opens normally, but the file is larger than expected for an image of this size.
+
+A separate handover note is believed to have been stored with the photograph. The examiner suspects the export process left a clue in the image metadata and that the second item may be embedded after the visible image data.
+
+OBJECTIVE
+Recover the handover note and extract the recovery marker.
+
+EXHIBIT A — archive_photo.jpg
+
+INVESTIGATION LEADS
+- Inspect the image metadata, especially the user comment field.
+- The user comment appears to be encoded text rather than a sentence.
+- Check whether data is appended after the JPEG image ends.
+
+All evidence is included locally. No live service or external account is required.

@@ -1,0 +1,18 @@
+CASE FILE: FR-04
+UNIT: DIGITAL FORENSICS
+STATUS: OPEN
+
+A USB drive was recovered during an investigation into the unauthorised removal of equipment from a storage facility. One image file could not be opened by the workstation used for triage.
+
+The file was not empty. The examiner observed binary data throughout the file and found a short format marker during a string scan, but the file identification utility reported only generic data.
+
+The image is believed to document the recovered property. Your task is to restore the file to a viewable state and inspect the evidence photograph.
+
+OBJECTIVE
+Identify the actual file format, determine what is wrong with its header, repair the file, and recover the key visible in the restored image.
+
+HANDOUT
+Exhibit A — recovered_photo.bin
+Exhibit B — evidence intake record
+
+You may use `file`, `xxd`, `hexdump`, a hex editor, or a short local script. Do not modify the original evidence copy.

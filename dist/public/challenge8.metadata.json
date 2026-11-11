@@ -1,0 +1,23 @@
+{
+  "id": 8,
+  "title": "The Red Tag",
+  "category": "Steganography",
+  "difficulty": "Easy",
+  "points": 100,
+  "type": "static_png_lsb",
+  "requires_internet": false,
+  "optional_online_tools": [
+    "https://www.aperisolve.com/",
+    "https://github.com/zed-0xff/zsteg"
+  ],
+  "inspiration": {
+    "technique": "PNG least-significant-bit steganography",
+    "references": [
+      "https://github.com/zed-0xff/zsteg",
+      "https://wiki.athena-ctf.com/docs/steganography/image-steg/lsb",
+      "https://www.aperisolve.com/wiki/techniques/images"
+    ]
+  },
+  "asset_directory": "public/challenges/stego_001/assets/",
+  "flag_format": "CTF{...}"
+}

@@ -1,0 +1,24 @@
+BROWSER ARTIFACT INTAKE
+Evidence ID: FR-11-A
+Profile owner: operator
+Artifact: Chromium History
+File type: SQLite 3 database
+Acquisition: Read-only profile copy
+
+Relevant tables:
+- urls: URL strings and page titles
+- visits: visit timeline
+- downloads: downloaded-file metadata and source-page information
+
+Examiner observations:
+- The requested filename appears in the inventory discrepancy report.
+- Multiple files were downloaded during the shift.
+- The download table records a target path, source tab URL and start time.
+- Chromium stores timestamps as microseconds since 1601-01-01 UTC (WebKit epoch).
+
+Suggested analysis:
+1. Work on a copy of the database.
+2. Inspect the schema with `.tables` and `.schema`.
+3. Query the downloads table for the exact target filename.
+4. Use the associated tab URL to identify the source hostname.
+5. Convert `start_time` from WebKit time to UTC.

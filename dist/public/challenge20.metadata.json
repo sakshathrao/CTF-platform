@@ -1,0 +1,10 @@
+{
+  "id": 20,
+  "title": "The Quiet Diagnostic",
+  "category": "Reverse Engineering",
+  "difficulty": "Medium",
+  "points": 150,
+  "type": "static",
+  "requires_internet": false,
+  "flag_format": "CTF{...}"
+}

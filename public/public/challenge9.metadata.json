@@ -1,0 +1,31 @@
+{
+  "id": 9,
+  "title": "The Sealed Handover",
+  "category": "Multi-stage",
+  "difficulty": "Easy",
+  "points": 100,
+  "type": "static_multistage_metadata_archive",
+  "requires_internet": false,
+  "stages": [
+    "EXIF UserComment Base64 decode",
+    "Find appended ZIP data",
+    "Use recovered password to extract handover note"
+  ],
+  "optional_online_tools": [
+    "https://exif.tools/",
+    "https://gchq.github.io/CyberChef/"
+  ],
+  "inspiration": {
+    "patterns": [
+      "CanYouSee \u2014 EXIF Base64 metadata",
+      "JPEG with appended ZIP archive"
+    ],
+    "references": [
+      "https://tan-junwei.github.io/CTF-Writeups/PicoCTF/Forensics/CanYouSee",
+      "https://0xjams.com/blog/forensics/forensic-beginner-challenges-pt3/",
+      "https://ctf.support/forensics/file-analysis/"
+    ]
+  },
+  "asset_directory": "public/challenges/multi_001/assets/",
+  "flag_format": "CTF{...}"
+}

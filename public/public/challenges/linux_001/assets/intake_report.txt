@@ -1,0 +1,11 @@
+LINUX WORKSPACE INTAKE
+Evidence ID: LX-07-A
+Archive: recovered_workspace.zip
+Format: ZIP archive
+Expected root folder: recovered_workspace/
+
+Initial triage:
+- The archive contains logs, inventory notes and dispatch records.
+- The active handover is believed to be under dispatch/active.
+- Dot-prefixed files and directories may be hidden from a normal ls listing.
+- Extract a working copy before examination.

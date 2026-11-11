@@ -1,0 +1,33 @@
+{
+  "id": 6,
+  "title": "The Maintenance Console",
+  "category": "Reverse Engineering",
+  "difficulty": "Easy",
+  "points": 100,
+  "type": "static_elf_binary",
+  "requires_internet": false,
+  "platform": {
+    "challenge_page": "/challenge6.html",
+    "asset_directory": "/challenges/reverse_001/assets/",
+    "submission": "POST /solve",
+    "challenge_id": 6
+  },
+  "inspiration": {
+    "source_patterns": [
+      "Beginner Ghidra/XOR crackme exercise",
+      "Flag Hunt beginner reverse-engineering challenge set"
+    ],
+    "references": [
+      "https://github.com/0x57Origin/Flag_Hunt",
+      "https://hackblue.org/learn/ctf-first-crackme-reversing"
+    ]
+  },
+  "participant_environment": "Linux x86-64 (Kali, Ubuntu, or WSL2)",
+  "recommended_tools": [
+    "file",
+    "strings",
+    "Ghidra",
+    "Cutter"
+  ],
+  "flag_format": "CTF{...}"
+}

@@ -12,7 +12,8 @@ const distDir = join(projectRoot, 'dist');
 // Skip binary, media, and already-compressed file formats
 const skipExtensions = new Set([
   '.iso', '.img', '.bin', '.wasm', '.bz2', '.xz', '.zip', '.br', '.gz',
-  '.png', '.jpg', '.jpeg', '.webp', '.gif', '.ico', '.mp4', '.webm', '.woff', '.woff2'
+  '.png', '.jpg', '.jpeg', '.webp', '.gif', '.ico', '.mp4', '.webm', '.woff', '.woff2',
+  '.pcap', '.pdf', '.wav', '.mbox', '.tar', '.tgz'
 ]);
 
 // Suitable text and code formats for precompression

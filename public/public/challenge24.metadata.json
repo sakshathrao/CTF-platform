@@ -1,0 +1,10 @@
+{
+  "id": 24,
+  "title": "The Prefix Behind the Portal",
+  "category": "OSINT / Network",
+  "difficulty": "Medium",
+  "points": 150,
+  "type": "static",
+  "requires_internet": false,
+  "flag_format": "CTF{...}"
+}

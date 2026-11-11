@@ -1,0 +1,24 @@
+{
+  "id": 12,
+  "title": "The Telegraph Ledger",
+  "category": "Cryptography",
+  "difficulty": "Easy-Medium",
+  "points": 125,
+  "type": "static_vigenere_cipher",
+  "requires_internet": false,
+  "optional_online_tools": [
+    "https://gchq.github.io/CyberChef/",
+    "https://www.dcode.fr/vigenere-cipher"
+  ],
+  "inspiration": {
+    "challenge": "Vigenere",
+    "platform": "picoCTF 2022",
+    "references": [
+      "https://play.picoctf.org/practice/challenge/316",
+      "https://github.com/TeachDian/picoCTF-writeups/blob/main/picoCTF_2022/Cryptography/Vigenere.md",
+      "https://primer.picoctf.org/"
+    ]
+  },
+  "asset_directory": "public/challenges/crypto_002/assets/",
+  "flag_format": "CTF{...}"
+}

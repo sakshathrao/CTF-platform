@@ -1,0 +1,29 @@
+From sender1@northpier.local Tue Nov 10 08:01:00 2026
+From: sender1@northpier.local
+Subject: Routine receipt 1
+
+Routine records check.
+From sender2@northpier.local Tue Nov 10 08:02:00 2026
+From: sender2@northpier.local
+Subject: Routine receipt 2
+
+Routine records check.
+From sender3@northpier.local Tue Nov 10 08:03:00 2026
+From: sender3@northpier.local
+Subject: Routine receipt 3
+
+Routine records check.
+From sender4@northpier.local Tue Nov 10 08:04:00 2026
+From: sender4@northpier.local
+Subject: Routine receipt 4
+
+Routine records check.
+From courier@northpier.local Tue Nov 10 08:17:00 2026
+From: courier@northpier.local
+To: archive@northpier.local
+Subject: Handover fragment
+X-Northpier-Record: Q1RGe3RoZV9oZWFkZXJfaG9sZHNfdGhlX2ZyYWdtZW50XzI1fQ==
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+
+Please retain the header with the message.

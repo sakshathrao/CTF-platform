@@ -1,0 +1,780 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Challenge 28</title>
+<link rel="stylesheet" href="/main.css">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Jost:ital,wght@0,100..900;1,100..900&display=swap');
+
+:root {
+  --bg-fallback: #090d14;
+  --glass-bg: rgba(13, 21, 30, 0.84);
+  --glass-card: rgba(255, 255, 255, 0.05);
+  --glass-card-hover: rgba(255, 255, 255, 0.10);
+  --glass-subtle: rgba(255, 255, 255, 0.035);
+  --ink: #e5e7eb;
+  --muted: #9ca3af;
+  --accent: #779399;
+  --accent-bright: #a5c4ca;
+  --line: rgba(255, 255, 255, 0.16);
+  --danger: #f87171;
+  --success: #4ade80;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--ink);
+  background-color: var(--bg-fallback);
+  background-image: url("/assets/file_00000000bd7c81f4aafde805674aabef_upscayl_2x_upscayl-standard-4x.png");
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  font-family: "Jost", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  padding: 110px 20px 60px;
+}
+
+#closedView {
+  display: none;
+  min-height: calc(100vh - 96px);
+  align-items: flex-start;
+  justify-content: center;
+  flex-direction: column;
+  padding-left: 6%;
+}
+
+main,
+.shell,
+.case-shell {
+  width: min(1020px, 100%);
+  max-width: 1020px;
+  margin: 0 auto;
+  padding: 36px clamp(22px, 5vw, 56px) 48px;
+  border-radius: 15px;
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(13, 21, 30, 0.86) 0%, rgba(10, 16, 24, 0.92) 100%);
+  backdrop-filter: blur(16px) saturate(260%) brightness(0.75);
+  -webkit-backdrop-filter: blur(16px) saturate(260%) brightness(0.75);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.65);
+  position: relative;
+}
+
+header,
+.top,
+.topline {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+  color: var(--muted);
+  font: 500 13px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Courier New", monospace;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 16px;
+}
+
+header span[style*="float"] {
+  float: none !important;
+}
+
+.back-link {
+  color: var(--ink);
+  text-decoration: none;
+  font-family: "Jost", sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  padding: 6px 14px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.back-link:hover {
+  background: rgba(255, 255, 255, 0.16);
+  transform: translateY(-1px);
+}
+
+h1,
+.case-title {
+  all: unset;
+  display: block;
+  margin: 24px 0 6px;
+  font-family: "Jost", sans-serif;
+  font-size: clamp(34px, 5vw, 54px);
+  line-height: 1.08;
+  font-weight: 400;
+  letter-spacing: -1.5px;
+  background: linear-gradient(181deg, #e5e7eb 30%, #9ca3af, #779399 75%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+small,
+.sub,
+.case-subtitle {
+  display: block;
+  margin: 0;
+  color: var(--accent-bright);
+  font: 500 13px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Courier New", monospace;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--glass-subtle);
+  padding: 15px 18px;
+  margin: 24px 0 28px;
+}
+
+.label,
+.meta-label,
+.section,
+.section-label,
+.kicker,
+.file-tag {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Courier New", monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+}
+
+.label,
+.meta-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 5px;
+}
+
+.value,
+.meta-value {
+  font: 600 15px "Jost", sans-serif;
+  color: #ffffff;
+}
+
+.section,
+.section-label {
+  color: var(--accent-bright);
+  font-size: 12px;
+  font-weight: 700;
+  margin: 28px 0 12px;
+}
+
+p {
+  font-size: 17px;
+  line-height: 1.65;
+  margin: 0 0 14px;
+  color: var(--ink);
+}
+
+.brief {
+  max-width: 880px;
+}
+
+.quote {
+  margin: 18px 0 22px;
+  padding: 14px 18px;
+  background: rgba(119, 147, 153, 0.14);
+  border-left: 3px solid var(--accent-bright);
+  border-radius: 0 8px 8px 0;
+  font-style: italic;
+  font-size: 18px;
+  color: #ffffff;
+}
+
+.box,
+.objective {
+  background: rgba(119, 147, 153, 0.12);
+  border: 1px solid rgba(165, 196, 202, 0.3);
+  border-radius: 10px;
+  padding: 16px 18px;
+  margin: 20px 0;
+  font-size: 17px;
+  line-height: 1.6;
+}
+
+.box b,
+.box strong,
+.objective strong {
+  color: #ffffff;
+}
+
+.handouts {
+  margin-top: 12px;
+}
+
+.handout {
+  display: grid;
+  grid-template-columns: 84px 1fr auto;
+  align-items: center;
+  background: var(--glass-card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  margin: 10px 0;
+  min-height: 68px;
+  text-decoration: none;
+  color: var(--ink);
+  overflow: hidden;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+
+.item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  background: var(--glass-card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px 20px;
+  margin: 10px 0;
+  color: #ffffff;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+
+.handout:hover,
+.item:hover {
+  background: var(--glass-card-hover);
+  border-color: rgba(255, 255, 255, 0.32);
+  transform: translateY(-1px);
+}
+
+.item b {
+  font-size: 16px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.item span {
+  color: var(--accent-bright);
+  font: 700 12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Courier New", monospace;
+  letter-spacing: 0.12em;
+  white-space: nowrap;
+}
+
+.tag,
+.handout-id {
+  align-self: stretch;
+  height: 100%;
+  min-height: 68px;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  background: rgba(119, 147, 153, 0.25);
+  border-right: 1px solid var(--line);
+  color: #ffffff;
+  font: 700 13px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Courier New", monospace;
+  letter-spacing: 0.1em;
+}
+
+.copy,
+.handout-copy {
+  padding: 12px 16px;
+}
+
+.name,
+.handout-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.hint,
+.handout-hint {
+  font: 12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Courier New", monospace;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+.open {
+  padding: 0 18px;
+  color: var(--accent-bright);
+  font: 700 12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Courier New", monospace;
+  letter-spacing: 0.12em;
+}
+
+.exhibit {
+  margin: 18px 0;
+  padding: 15px;
+  background: var(--glass-subtle);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.exhibit img {
+  display: block;
+  width: 100%;
+  max-height: 650px;
+  object-fit: contain;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.caption {
+  font: 12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Courier New", monospace;
+  color: var(--muted);
+  line-height: 1.5;
+  margin-top: 10px;
+}
+
+ol,
+.steps {
+  font-size: 17px;
+  line-height: 1.7;
+  padding-left: 24px;
+  color: var(--ink);
+}
+
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Courier New", monospace;
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.92em;
+}
+
+.tool {
+  display: inline-block;
+  color: #111111;
+  background: #e5e7eb;
+  padding: 9px 16px;
+  border-radius: 8px;
+  text-decoration: none;
+  font: 600 13px "Jost", sans-serif;
+  letter-spacing: 0.04em;
+  margin: 6px 8px 6px 0;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.tool:hover {
+  background: #ffffff;
+  transform: translateY(-1px);
+}
+
+.flag-area {
+  margin-top: 16px;
+}
+
+form,
+.flag-form {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: center;
+}
+
+form input,
+.flag-form input {
+  all: unset;
+  box-sizing: border-box;
+  width: 100%;
+  height: 44px;
+  padding: 0 14px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+  font-family: "Jost", sans-serif;
+  font-size: 16px;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+form input:focus,
+.flag-form input:focus {
+  border-color: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+form input:disabled,
+.flag-form input:disabled {
+  opacity: 0.55;
+}
+
+form button,
+.flag-form button {
+  all: unset;
+  box-sizing: border-box;
+  height: 44px;
+  padding: 0 26px;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #111111;
+  font-family: "Jost", sans-serif;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: center;
+  transition: transform 0.15s, background 0.15s, opacity 0.15s;
+}
+
+form button:hover:not(:disabled),
+.flag-form button:hover:not(:disabled) {
+  background: #e5e7eb;
+  transform: translateY(-1px);
+}
+
+form button:disabled,
+.flag-form button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.status {
+  font: 500 14px "Jost", sans-serif;
+  min-height: 24px;
+  margin-top: 12px;
+  color: var(--danger);
+}
+
+.status.ok {
+  color: var(--success);
+}
+
+footer,
+.foot,
+.footer {
+  margin-top: 32px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font: 12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Courier New", monospace;
+  line-height: 1.5;
+}
+
+@media (max-width: 640px) {
+  body {
+    padding: 16px 10px 40px;
+  }
+  main,
+  .shell,
+  .case-shell {
+    padding: 24px 16px 36px;
+  }
+  .meta {
+    grid-template-columns: 1fr;
+  }
+  .handout {
+    grid-template-columns: 64px 1fr auto;
+  }
+  .item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .copy,
+  .handout-copy {
+    padding: 10px;
+  }
+  .open {
+    padding: 0 10px;
+    font-size: 11px;
+  }
+  p {
+    font-size: 16px;
+  }
+  form,
+  .flag-form {
+    grid-template-columns: 1fr;
+  }
+}
+</style></head><body>
+
+  <header id="ctfNavbar" class="navbar" style="display: none;">
+    <div class="navLeft">
+      <a href="/main.html" class="navHomeLink">
+        <span class="navBrand">CTF</span>
+        <span class="navDivider">/</span>
+        <span class="navTeamLabel">TEAM</span>
+        <span class="navTeamName" id="navTeamName"></span>
+      </a>
+    </div>
+    <nav>
+      <a href="/main.html" class="navLink">Challenges</a>
+      <a href="/leaderboard.html" class="navLink">Leaderboard</a>
+      <div class="navPoints">
+        <span class="pointsLabel">Points:</span>
+        <span class="pointsValue" id="navPoints">0</span>
+      </div>
+      <button type="button" id="logoutBtn" class="navLogoutBtn">Logout</button>
+    </nav>
+  </header>
+<div id="closedView" class="main_bg start">
+  <h1small>This form isn't accepting <br> responses right now.</h1small>
+</div>
+<main><header>NORTH PIER / DIGITAL INVESTIGATIONS <span style="float:right">CASE 028</span><a class="back-link" href="/main.html">← Back to Challenges</a></header><h1>The Glass Harbor</h1><small>STEGANOGRAPHY / FORENSICS / EASY-MEDIUM / 125 POINTS</small><div class="section">CASE BRIEF</div><p>A North Pier harbor recording contains a frequency pattern. View the audio spectrogram and read the 5×7 character grid from left to right.</p><div class="box"><b>OBJECTIVE</b><br>Read the 5×7 letters from the spectrogram. Combine the recovered direction word with the site name North Pier, lowercase and join with an underscore inside CTF{...}.</div><div class="section">HANDOUTS & EVIDENCE</div><a class="item" href="/challenges/challenge_028/assets/harbor_spectrogram.wav" download><b>harbor_spectrogram.wav</b><span>OPEN / DOWNLOAD ↗</span></a><a class="item" href="/challenges/challenge_028/assets/spectrogram_readme.txt" download><b>spectrogram_readme.txt</b><span>OPEN / DOWNLOAD ↗</span></a><a class="item" href="/challenges/challenge_028/assets/evidence_bundle.zip" download><b>Complete evidence bundle</b><span>DOWNLOAD ↗</span></a><div class="section">SUBMIT FLAG</div><form id="f"><input id="flag" placeholder="CTF{...}" required autocomplete="off"><button>SUBMIT</button></form><div class="status" id="s"></div><footer>STATIC CASE / EVIDENCE INCLUDED LOCALLY / FLAG VERIFIED SERVER-SIDE</footer></main>
+<script>
+"use strict";
+
+const CHALLENGE_ID = 28;
+const challengeID = 28;
+const DEFAULT_POINTS = 125;
+const isDev = location.port === "5173" || location.port === "5174";
+const apiBase = isDev ? `http://${location.hostname}:3001` : "";
+const wsProtocol = location.protocol === "https:" ? "wss:" : "ws:";
+const wsHost = isDev ? `${location.hostname}:3001` : location.host;
+
+let eventStarted = false;
+let solved = false;
+
+function getElements() {
+  return {
+    shell: document.querySelector(".shell, .case-shell, main"),
+    closed: document.getElementById("closedView"),
+    form: document.getElementById("flagForm") || document.getElementById("f") || document.querySelector("form"),
+    input: document.getElementById("flagInput") || document.getElementById("flag") || document.querySelector("form input"),
+    button: document.getElementById("submitButton") || document.querySelector("form button"),
+    status: document.getElementById("result") || document.getElementById("s") || document.querySelector(".status"),
+  };
+}
+
+function getProgressCookie() {
+  for (const cookie of document.cookie.split(";")) {
+    const [key, ...value] = cookie.trim().split("=");
+    if (key === "ctf_progress") {
+      try {
+        return JSON.parse(decodeURIComponent(value.join("=")));
+      } catch {
+        return null;
+      }
+    }
+  }
+  return null;
+}
+
+async function getJSON(path) {
+  const response = await fetch(`${apiBase}${path}`, { credentials: "include" });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  return response.json();
+}
+
+function applySolvedState(msg) {
+  solved = true;
+  const { input, button, status } = getElements();
+  if (input) input.disabled = true;
+  if (button) button.disabled = true;
+  if (status) {
+    status.classList.add("ok");
+    status.textContent = msg || "YOUR TEAM HAS ALREADY SOLVED THIS CASE.";
+  }
+}
+
+function renderEventState(state) {
+  const { shell, closed, button, status } = getElements();
+  eventStarted = Boolean(state && state.layout === "start");
+
+  if (state && typeof state.timerEnd === "number" && Date.now() >= state.timerEnd) {
+    eventStarted = false;
+  }
+
+  if (!eventStarted) {
+    if (shell) shell.style.display = "none";
+    if (closed) closed.style.display = "flex";
+    if (button && !solved) button.disabled = true;
+  } else {
+    if (closed) closed.style.display = "none";
+    if (shell) shell.style.display = "block";
+    if (!solved) {
+      if (button) button.disabled = false;
+      if (status && (status.textContent === "EVENT NOT STARTED." || status.textContent === "EVENT ENDED.")) {
+        status.textContent = "";
+      }
+    }
+  }
+}
+
+async function submitFlag(event) {
+  event.preventDefault();
+  const { input, button, status } = getElements();
+  const flag = input ? input.value.trim() : "";
+
+  if (!eventStarted) {
+    if (status) {
+      status.classList.remove("ok");
+      status.textContent = "EVENT NOT CURRENTLY ACCEPTING SUBMISSIONS.";
+    }
+    return;
+  }
+  if (!flag) return;
+
+  if (button) button.disabled = true;
+  if (status) {
+    status.classList.remove("ok");
+    status.textContent = "VERIFYING…";
+  }
+
+  try {
+    const response = await fetch(`${apiBase}/solve`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ challengeId: CHALLENGE_ID, flag }),
+    });
+    const data = await response.json().catch(() => ({}));
+
+    if (response.ok && data.success) {
+      const pts = data.totalPoints ?? data.pointsAwarded ?? DEFAULT_POINTS;
+      const pointsEl = document.getElementById("navPoints");
+      if (pointsEl && typeof data.totalPoints === "number") {
+        pointsEl.textContent = data.totalPoints;
+      }
+      try {
+        const bc = new BroadcastChannel("ctf_progress");
+        bc.postMessage({ type: "progress", points: data.totalPoints, solved: [CHALLENGE_ID] });
+        bc.close();
+      } catch {}
+      applySolvedState(`CASE CLOSED — +${data.pointsAwarded ?? DEFAULT_POINTS} POINTS`);
+      return;
+    }
+    if (response.status === 401) {
+      location.replace("/login.html");
+      return;
+    }
+    if (response.status === 409) {
+      applySolvedState("YOUR TEAM HAS ALREADY SOLVED THIS CASE.");
+      return;
+    }
+    if (status) status.textContent = data.error || "INCORRECT FLAG — PLEASE TRY AGAIN.";
+    if (button) button.disabled = false;
+  } catch (err) {
+    console.error(err);
+    if (status) status.textContent = "SERVER CONNECTION FAILED — PLEASE TRY AGAIN.";
+    if (button) button.disabled = false;
+  }
+}
+
+function connectSocket() {
+  const ws = new WebSocket(`${wsProtocol}//${wsHost}`);
+
+  ws.addEventListener("message", (event) => {
+    try {
+      const state = JSON.parse(event.data);
+      if (state && state.type === "progress") {
+        const pointsEl = document.getElementById("navPoints");
+        if (pointsEl && typeof state.points === "number") {
+          pointsEl.textContent = state.points;
+        }
+        if (Array.isArray(state.solved) && state.solved.includes(CHALLENGE_ID)) {
+          applySolvedState("YOUR TEAM HAS ALREADY SOLVED THIS CASE.");
+        }
+        return;
+      }
+      renderEventState(state);
+    } catch (err) {
+      console.error("Invalid event state:", err);
+    }
+  });
+
+  ws.addEventListener("close", () => {
+    setTimeout(connectSocket, 2500);
+  });
+}
+
+async function checkSession() {
+  try {
+    const res = await fetch(`${apiBase}/session`, { credentials: "include" });
+    if (!res.ok) {
+      location.replace("/login.html");
+      return false;
+    }
+    const data = await res.json();
+    const nav = document.getElementById("ctfNavbar");
+    if (nav) {
+      const teamEl = document.getElementById("navTeamName");
+      const pointsEl = document.getElementById("navPoints");
+      if (teamEl) teamEl.textContent = data.teamName || "";
+      if (pointsEl) pointsEl.textContent = data.points ?? 0;
+      nav.style.display = "flex";
+    }
+    const logoutBtn = document.getElementById("logoutBtn");
+    if (logoutBtn) {
+      logoutBtn.onclick = async () => {
+        logoutBtn.disabled = true;
+        try {
+          const bc = new BroadcastChannel("ctf_progress");
+          bc.postMessage({ type: "auth_change", loggedIn: false });
+          bc.close();
+        } catch {}
+        try {
+          await fetch(`${apiBase}/logout`, { method: "POST", credentials: "include" });
+        } catch {}
+        document.cookie = "session=; Max-Age=0; path=/;";
+        document.cookie = "ctf_progress=; Max-Age=0; path=/;";
+        location.replace("/login.html");
+      };
+    }
+    return true;
+  } catch {
+    location.replace("/login.html");
+    return false;
+  }
+}
+
+async function init() {
+  const authed = await checkSession();
+  if (!authed) return;
+
+  const cookieProgress = getProgressCookie();
+  if (cookieProgress && Array.isArray(cookieProgress.solved) && cookieProgress.solved.includes(CHALLENGE_ID)) {
+    solved = true;
+  }
+  try {
+    const progress = await getJSON("/progress");
+    if (progress) {
+      const pointsEl = document.getElementById("navPoints");
+      if (pointsEl && typeof progress.points === "number") {
+        pointsEl.textContent = progress.points;
+      }
+      if (Array.isArray(progress.solved) && progress.solved.includes(CHALLENGE_ID)) {
+        solved = true;
+      }
+    }
+  } catch {}
+
+  const { form } = getElements();
+  if (form) form.addEventListener("submit", submitFlag);
+
+  if (solved) {
+    applySolvedState("YOUR TEAM HAS ALREADY SOLVED THIS CASE.");
+  }
+
+  try {
+    const initialState = await getJSON("/state");
+    renderEventState(initialState);
+  } catch {}
+
+  connectSocket();
+
+  try {
+    const bc = new BroadcastChannel("ctf_progress");
+    bc.onmessage = (event) => {
+      if (event.data && event.data.type === "auth_change" && !event.data.loggedIn) {
+        location.replace("/login.html");
+        return;
+      }
+      if (event.data && typeof event.data.points === "number") {
+        const pointsEl = document.getElementById("navPoints");
+        if (pointsEl) pointsEl.textContent = event.data.points;
+      }
+      if (event.data && Array.isArray(event.data.solved) && event.data.solved.includes(CHALLENGE_ID)) {
+        applySolvedState("YOUR TEAM HAS ALREADY SOLVED THIS CASE.");
+      }
+    };
+  } catch {}
+}
+
+init();
+</script></body></html>

@@ -1,0 +1,1 @@
+Workstation 10.20.4.41; remote 198.51.100.22; time 08:44:12 UTC. Recover the hostname advertised by the TLS ClientHello. Normalize dots to underscores for the CTF flag.

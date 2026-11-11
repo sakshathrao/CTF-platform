@@ -1,5 +1,10 @@
 import { defineConfig } from "vite";
 
+const challengeInputs = {};
+for (let i = 1; i <= 31; i++) {
+    challengeInputs[`challenge${i}`] = `challenge${i}.html`;
+}
+
 export default defineConfig({
     build: {
         rollupOptions: {
@@ -7,14 +12,9 @@ export default defineConfig({
                 main: "main.html",
                 login: "login.html",
                 registration: "registration.html",
-                challenge1: "challenge1.html",
-                challenge2: "challenge2.html",
-                challenge3: "challenge3.html",
-                challenge4: "challenge4.html",
-                challenge5: "challenge5.html",
-                challenge6: "challenge6.html",
                 leaderboard: "leaderboard.html",
                 admin: "admin.html",
+                ...challengeInputs,
             },
         },
     },

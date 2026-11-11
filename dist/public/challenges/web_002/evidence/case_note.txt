@@ -1,0 +1,17 @@
+CASE FILE: WB-10
+UNIT: WEB APPLICATION REVIEW
+STATUS: OPEN
+
+A public archive portal was recovered from an old records workstation. Staff members reported that the portal sometimes displayed a different document after a browser refresh, even when the user had not selected a new record.
+
+The recovered interface says that the current archive slot is maintained by the browser. The original access-control review was never completed.
+
+OBJECTIVE
+Inspect the portal's browser storage, identify the value used to select an archive record, and determine whether changing that value reveals a restricted bulletin.
+
+The restricted bulletin contains the recovery marker required for this case.
+
+EXHIBIT A — local North Pier archive portal
+EXHIBIT B — application intake report
+
+Use browser developer tools. No scanning of external sites or real accounts is required.

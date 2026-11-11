@@ -1,0 +1,10 @@
+{
+  "id": 17,
+  "title": "The Redacted Export",
+  "category": "Forensics",
+  "difficulty": "Easy-Medium",
+  "points": 125,
+  "type": "static",
+  "requires_internet": false,
+  "flag_format": "CTF{...}"
+}

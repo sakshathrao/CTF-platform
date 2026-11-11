@@ -1,0 +1,16 @@
+DIGITAL EVIDENCE INTAKE
+Case: CR-05
+Item: NP-05 dispatch copy
+Format: UTF-8 text and scanned image
+Integrity: Both copies agree
+
+Examiner's initial observation:
+The text uses ordinary Latin letters, digits, underscores and braces. It does not appear to be compressed or encrypted using a modern cryptographic algorithm.
+
+The margin note refers to a rotation by half of the alphabet. The message preserves its original case and punctuation.
+
+Suggested examination:
+- Identify the alphabet length.
+- Interpret the half-alphabet rotation.
+- Apply the corresponding letter substitution to the complete message.
+- Preserve the flag wrapper and punctuation.

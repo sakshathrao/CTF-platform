@@ -1,0 +1,1 @@
+Only the compressed webroot export was retained. The normal commit history omits the handover note.

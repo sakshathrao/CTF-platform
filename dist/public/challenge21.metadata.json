@@ -1,0 +1,10 @@
+{
+  "id": 21,
+  "title": "The Orphaned Worker",
+  "category": "Linux/Misc",
+  "difficulty": "Easy-Medium",
+  "points": 125,
+  "type": "static",
+  "requires_internet": false,
+  "flag_format": "CTF{...}"
+}

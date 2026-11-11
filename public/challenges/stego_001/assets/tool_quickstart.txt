@@ -1,0 +1,30 @@
+CHALLENGE 008 — TOOL QUICKSTART
+THE RED TAG / PNG RED-CHANNEL LSB
+
+Kali Linux / Ubuntu / WSL2
+--------------------------
+1. Check Ruby:
+   ruby --version
+2. Install zsteg:
+   gem install zsteg
+   If a system-wide install is blocked, use:
+   gem install --user-install zsteg
+   Then add Ruby's user gem `bin` directory to PATH if the installer prints a warning.
+3. Scan supported bit planes:
+   zsteg -a exhibit_A_storage_photo.png
+4. Extract the indicated payload:
+   zsteg -E 'b1,r,lsb,xy' exhibit_A_storage_photo.png
+
+Command key:
+- `b1`: one bit per pixel channel
+- `r`: red channel
+- `lsb`: least-significant bit
+- `xy`: left-to-right, top-to-bottom pixel order
+
+Windows
+-------
+Recommended: Kali Linux or Ubuntu under WSL2, then use the commands above.
+Optional browser-based path: https://www.aperisolve.com/
+Do not upload personal or confidential photos to public services.
+
+Tool reference: https://github.com/zed-0xff/zsteg

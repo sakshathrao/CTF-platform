@@ -1,0 +1,10 @@
+{
+  "id": 27,
+  "title": "The Timer's Last Tick",
+  "category": "Linux/Misc",
+  "difficulty": "Easy-Medium",
+  "points": 125,
+  "type": "static",
+  "requires_internet": false,
+  "flag_format": "CTF{...}"
+}

@@ -1,0 +1,25 @@
+{
+  "id": 13,
+  "title": "The First Footprint",
+  "category": "OSINT",
+  "difficulty": "Easy-Medium",
+  "points": 125,
+  "type": "static_wayback_historical_research",
+  "requires_internet": true,
+  "offline_assets": true,
+  "research_target": "http://www.python.org/1.5/",
+  "optional_online_resources": [
+    "https://web.archive.org/web/*/http://www.python.org/1.5/",
+    "https://archivesupport.zendesk.com/hc/en-us/articles/360004651732-Using-The-Wayback-Machine"
+  ],
+  "inspiration": {
+    "challenge_pattern": "Archived Company Website",
+    "platform": "TryHackMe Digital Footprint",
+    "references": [
+      "https://tryhackme.com/room/osintchallengeiv",
+      "https://archivesupport.zendesk.com/hc/en-us/articles/360004651732-Using-The-Wayback-Machine"
+    ]
+  },
+  "flag_format": "CTF{YYYYMMDDHHMMSS}",
+  "asset_directory": "public/challenges/osint_002/assets/"
+}

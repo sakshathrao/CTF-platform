@@ -1,0 +1,9 @@
+{
+  "objectClassName": "ip network",
+  "handle": "GITHU",
+  "name": "GitHub, Inc.",
+  "startAddress": "140.82.112.0",
+  "endAddress": "140.82.127.255",
+  "ipVersion": "v4",
+  "country": "US"
+}

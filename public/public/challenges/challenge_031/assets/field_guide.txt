@@ -1,0 +1,1 @@
+Event 4624 TargetLogonId identifies the session. Sysmon Event 1 LogonId and CommandLine identify a process in that session. These are XML exports, not native EVTX. Decode Base64 as UTF-16LE.

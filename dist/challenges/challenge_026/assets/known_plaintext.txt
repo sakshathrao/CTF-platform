@@ -1,0 +1,2 @@
+Known complete plaintext of C1: NORTHPIER-ARCHIVE-RECEIPT-00000000
+The same key stream was mistakenly reused for C2.

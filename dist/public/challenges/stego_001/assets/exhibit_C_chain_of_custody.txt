@@ -1,0 +1,14 @@
+IMAGE EVIDENCE CHAIN OF CUSTODY
+Evidence ID: ST-08-A
+Original filename: storage_cam_04.png
+Received filename: exhibit_A_storage_photo.png
+Format: PNG, RGB
+Acquisition: Copy exported from CCTV review workstation
+Visual inspection: No obvious alteration
+
+Examiner note:
+A red property tag is visible near the lower portion of the image. The source workstation's export settings were known to retain selected pixel-level annotations.
+
+No password-protected archive or external attachment was found alongside the image.
+
+Preserve the supplied file unchanged during examination.

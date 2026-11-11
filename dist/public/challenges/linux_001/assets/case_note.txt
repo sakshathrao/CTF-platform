@@ -1,0 +1,17 @@
+CASE FILE: LX-07
+UNIT: LINUX SYSTEMS REVIEW
+STATUS: OPEN
+
+A small Linux file server used by the North Pier dispatch team was copied during an equipment audit. The active handover record was missing from the previous examiner's visible directory listing.
+
+The examiner's notes indicate that the handover was stored beneath dispatch/active, inside a dot-prefixed directory, and that the note itself also used a hidden filename.
+
+OBJECTIVE
+Extract the workspace archive, locate the hidden handover note under dispatch/active, and recover its recovery marker.
+
+EXHIBIT A — recovered_workspace.zip
+
+TOOLS
+Use a Linux shell. The standard commands unzip, cd, ls -a, find and cat are sufficient.
+
+No server connection or Internet access is needed.

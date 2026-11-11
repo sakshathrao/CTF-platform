@@ -1,0 +1,10 @@
+{
+  "id": 30,
+  "title": "The Three-Key Cabinet",
+  "category": "Cryptography",
+  "difficulty": "Medium",
+  "points": 150,
+  "type": "static",
+  "requires_internet": false,
+  "flag_format": "CTF{...}"
+}

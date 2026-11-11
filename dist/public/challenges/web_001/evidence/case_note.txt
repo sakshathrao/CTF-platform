@@ -1,0 +1,18 @@
+CASE FILE: WEB-03
+UNIT: Application Security Response
+STATUS: OPEN
+
+A legacy communications portal was recovered from an exposed web archive after its maintainers reported that an old deployment package had been published unintentionally.
+
+The visible website appears harmless. The original developers used separate files for page structure, presentation and browser-side interactions.
+
+Investigators suspect that a deployment marker was left in the client-side source files during a previous build.
+
+OBJECTIVE
+Inspect the recovered portal and reconstruct the three-part deployment marker.
+
+HANDOUTS
+Exhibit A — Recovered portal snapshot
+Exhibit B — Evidence intake note
+
+The portal is supplied locally in this package. No external service, account or login is required.

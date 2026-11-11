@@ -1,0 +1,10 @@
+{
+  "id": 16,
+  "title": "The Crawler's Blind Spot",
+  "category": "Web",
+  "difficulty": "Easy",
+  "points": 100,
+  "type": "static",
+  "requires_internet": false,
+  "flag_format": "CTF{...}"
+}

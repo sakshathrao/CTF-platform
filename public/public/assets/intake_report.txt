@@ -1,0 +1,19 @@
+NETWORK EVIDENCE INTAKE
+Evidence ID: NET-04-A
+File: gateway_capture.pcap
+Capture type: Ethernet
+Source: workstation image acquisition
+Recorded workstation: 10.10.4.21
+Recorded archive gateway: 192.0.2.44
+
+Initial review:
+- DNS and HTTP traffic are present.
+- Multiple HTTP requests appear in the capture.
+- One request retrieves a text report from the archive service.
+- The report was transferred without transport encryption.
+
+Suggested analysis:
+1. Open the capture in Wireshark.
+2. Filter HTTP traffic.
+3. Inspect request paths and identify the report download.
+4. Follow the relevant TCP stream to reconstruct the response body.

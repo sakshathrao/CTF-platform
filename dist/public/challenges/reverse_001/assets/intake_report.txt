@@ -1,0 +1,21 @@
+BINARY EVIDENCE INTAKE
+Evidence ID: RE-06-A
+Filename: northstar_console
+Platform: Linux x86-64
+Format: ELF executable
+Network activity: None expected
+Purpose: Maintenance access validation
+
+Initial observations:
+- Program prompts for a maintenance access code.
+- The success and failure messages are visible in the binary.
+- The code check appears to be performed by a separate validation function.
+- The stored comparison bytes are transformed before they are checked.
+
+Suggested analysis:
+1. Identify the binary format with `file`.
+2. Inspect visible strings.
+3. Import the executable into Ghidra or Cutter.
+4. Find the validation routine called by `main`.
+5. Follow the byte transformation and recover the expected input.
+6. Execute the program and retrieve the recovery record.

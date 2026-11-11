@@ -1,0 +1,18 @@
+CASE FILE: ST-08
+UNIT: DIGITAL EVIDENCE / IMAGE EXAMINATION
+STATUS: OPEN
+
+A CCTV still was recovered from the records storeroom after a sealed property case was found unattended.
+
+The image looks ordinary when viewed normally. The previous examiner noted that the evidence was exported through an image-processing workflow that can preserve hidden information in pixel data.
+
+A red property tag is visible on the worktable. The examiner's handwritten note says:
+
+    "The warning colour is carrying more than the scene."
+
+OBJECTIVE
+Examine the image for concealed data, identify the channel carrying the hidden message, and recover the recovery marker.
+
+EXHIBIT A — exhibit_A_storage_photo.png
+
+You may use zsteg, a bit-plane viewer, or an online image steganography analyzer. The PNG is provided locally.

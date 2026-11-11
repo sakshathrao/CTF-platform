@@ -1,0 +1,19 @@
+CASE FILE: RE-06
+UNIT: BINARY ANALYSIS / INCIDENT RESPONSE
+STATUS: OPEN
+
+A small maintenance console was recovered from a decommissioned equipment station. The program still runs, but its operator access code was not recorded in the handover documents.
+
+The console accepts a short access code and prints a recovery record only when the input is correct. Investigators believe the validation logic is contained entirely within the supplied Linux executable.
+
+OBJECTIVE
+Analyze the executable, recover the maintenance access code from its validation routine, run the program with that code, and retrieve the recovery record.
+
+EXHIBIT A
+northstar_console — Linux x86-64 ELF executable
+
+NOTES
+- The binary is supplied for static analysis and local execution.
+- It is a harmless training utility and does not connect to a network.
+- Ghidra or Cutter is recommended. `file` and `strings` are useful first checks.
+- Do not expect the access code or final record to appear as readable plaintext strings.

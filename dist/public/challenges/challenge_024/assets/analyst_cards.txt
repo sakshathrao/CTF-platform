@@ -1,0 +1,3 @@
+Card A — Address range: 140.82.112.0/20
+Card B — Origin ASN: AS36459
+Normalize the registered organization name to lowercase with spaces replaced by underscores, append `_as` and the ASN digits, then wrap the result in CTF{...}.

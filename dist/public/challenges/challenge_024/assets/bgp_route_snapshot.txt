@@ -1,0 +1,4 @@
+Prefix: 140.82.112.0/20
+Origin ASN: AS36459
+Observed: 2026-11-10T08:00:00Z
+Offline event fallback snapshot.

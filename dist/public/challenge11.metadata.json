@@ -1,0 +1,26 @@
+{
+  "id": 11,
+  "title": "The Last Download",
+  "category": "Forensics",
+  "difficulty": "Easy-Medium",
+  "points": 125,
+  "type": "static_chromium_history_sqlite",
+  "requires_internet": false,
+  "participant_tools": [
+    "sqlite3",
+    "DB Browser for SQLite"
+  ],
+  "inspiration": {
+    "patterns": [
+      "MetaCTF \u2014 Browser, Wowser (SQLite browser history analysis)",
+      "CyberSkyline \u2014 History (Firefox SQLite history analysis)"
+    ],
+    "references": [
+      "https://metactf.com/blog/flash-ctf-browser-wowser/",
+      "https://trove.cyberskyline.com/038f8feecbf4489a9ee68d8c2131b49c"
+    ]
+  },
+  "asset_directory": "public/challenges/forensics_002/assets/",
+  "flag_format": "CTF{hostname_YYYYMMDD_HHMM}",
+  "timestamp_epoch": "Chromium WebKit microseconds since 1601-01-01 UTC"
+}

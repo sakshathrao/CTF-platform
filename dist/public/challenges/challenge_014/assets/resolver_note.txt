@@ -1,0 +1,1 @@
+Client 10.20.4.23; resolver 10.20.4.53. The verification lookup should return a TXT record. Inspect the answer section.

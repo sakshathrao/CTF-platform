@@ -1,0 +1,21 @@
+{
+  "id": 5,
+  "title": "The Half-Turn Message",
+  "category": "Cryptography",
+  "difficulty": "Easy",
+  "points": 100,
+  "type": "static_classical_cipher",
+  "requires_internet": false,
+  "optional_online_tool": "https://gchq.github.io/CyberChef/",
+  "inspiration": {
+    "challenge": "13",
+    "event": "picoCTF 2019",
+    "references": [
+      "https://play.picoctf.org/practice/challenge/18",
+      "https://yorzaren.github.io/ctf/picoctf-2019/13/"
+    ]
+  },
+  "flag_format": "CTF{...}",
+  "deployment": "public/challenge5.html",
+  "assets": "public/challenges/crypto_001/assets/"
+}

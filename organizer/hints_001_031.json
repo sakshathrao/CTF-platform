@@ -1,0 +1,157 @@
+{
+  "1": [
+    "Search the exact quoted phrase from the recovered note together with the word \u201cbronze\u201d.",
+    "The object is a Himalayan protector deity. The museum record uses a two-word title beginning with the object's name.",
+    "In the official collection record, look under \u201cArtwork Details.\u201d The requested value is labelled \u201cObject number,\u201d not \u201cHAR Number.\u201d"
+  ],
+  "2": [
+    "The capture contains several HTTP requests. Start by filtering with `http`.",
+    "Look for the request path that mentions a shift report rather than the health endpoint.",
+    "Follow the TCP stream for `/exports/shift-report.txt`; the server response contains a plain-text report."
+  ],
+  "3": [
+    "The visible page is only what the browser renders. Inspect the original response sent by the server.",
+    "The page links to a separate stylesheet and a JavaScript file. Open those files directly.",
+    "Look for developer comments in all three source files. Join the three segments in order."
+  ],
+  "4": [
+    "The examiner found a `JFIF` marker in the data. What common image format uses this marker?",
+    "A JPEG file starts with `FF D8 FF`. Compare those bytes with the first bytes shown by `xxd`.",
+    "Replace the first two bytes `5C 78` with `FF D8` in a copy, then open the restored image."
+  ],
+  "5": [
+    "The note mentions a rotation equal to half of a complete alphabet. How many letters are in the English alphabet?",
+    "A rotation by 13 letters is commonly called ROT13.",
+    "ROT13 is its own inverse. Apply it to the entire text, including uppercase letters."
+  ],
+  "6": [
+    "`strings` shows useful labels, but the code itself does not appear as a readable string. Look for the function called by `main`.",
+    "In `validate_code`, note that every input byte is XORed with an element of `access_key`.",
+    "The key repeats every five characters. XOR each byte in `encrypted_code` with the matching byte in `access_key` to recover the input."
+  ],
+  "7": [
+    "Navigate to `recovered_workspace/dispatch/active` first.",
+    "Linux directory listings hide names beginning with a dot. Try `ls -la`.",
+    "The hidden directory is `.handover`; inside it, read `.handover_note.txt`."
+  ],
+  "8": [
+    "The image is a PNG, so inspect its pixel data as well as metadata.",
+    "The examiner's note refers to the warning colour visible in the photograph. Check that colour channel.",
+    "Use `zsteg -E 'b1,r,lsb,xy' exhibit_A_storage_photo.png` to extract the message."
+  ],
+  "9": [
+    "The image is a JPEG. Check its EXIF fields, especially the user comment.",
+    "The user comment looks like Base64. Decode it; it is not the flag, but it is useful for the next step.",
+    "A ZIP archive is appended after the JPEG. Use the decoded text as the archive password."
+  ],
+  "10": [
+    "The portal says the current archive slot is maintained by the browser. Look at the browser's stored cookies.",
+    "Find the cookie that contains a number. Change it and refresh the page.",
+    "Try the sequential record slots. The restricted bulletin is returned by slot `18`."
+  ],
+  "11": [
+    "The History file is a SQLite database. Start with `.tables` and inspect the `downloads` schema.",
+    "Query the download record using the filename from the case note. `tab_url` records the page that initiated it.",
+    "Chromium timestamps count microseconds since 1601-01-01. Use `datetime(start_time/1000000 - 11644473600, 'unixepoch')`, then normalize to `YYYYMMDD_HHMM`."
+  ],
+  "12": [
+    "The memo says the operator used the station call-sign as a repeating word. Remove its space.",
+    "The message uses a repeating-key alphabetic cipher. The classic cipher name is associated with a 16th-century French cryptographer.",
+    "Use Vigen\u00e8re decryption with key `NORTHPIER`. Leave non-letters unchanged."
+  ],
+  "13": [
+    "The question is about the exact `/1.5/` page, not the Python website homepage.",
+    "In the Wayback calendar, look for the earliest successful capture. A blue capture indicates an HTTP 2xx response; green indicates a redirect.",
+    "The timestamp is the 14-digit number in the middle of the archived URL. Use the `YYYYMMDDHHMMSS` format."
+  ],
+  "14": [
+    "Filter DNS and inspect response records.",
+    "Find the verification TXT answer.",
+    "Base64-decode the TXT value."
+  ],
+  "15": [
+    "Apply the arp display filter.",
+    "Find multiple sender MACs claiming 10.20.4.1.",
+    "Compare them with the inventory."
+  ],
+  "16": [
+    "Open robots.txt.",
+    "Follow the Disallow path.",
+    "Decode the archive index value."
+  ],
+  "17": [
+    "Try pdftotext.",
+    "The black bar is only a drawing overlay.",
+    "Extract the text-layer marker."
+  ],
+  "18": [
+    "Use the DTMF frequency chart.",
+    "Decode three digits per character.",
+    "Convert each group to ASCII."
+  ],
+  "19": [
+    "The exponent is 3.",
+    "Test c+k*n for small k.",
+    "The exact cube occurs at k=4."
+  ],
+  "20": [
+    "Use Linux x86-64 or WSL2.",
+    "Run chmod +x and inspect strings.",
+    "Try --recover with the supplied hex input."
+  ],
+  "21": [
+    "environ is NUL-separated.",
+    "Find NORTHPIER_HANDOVER.",
+    "Decode its Base64 value."
+  ],
+  "22": [
+    "Extract webroot_export.tar.gz.",
+    "Run git fsck --no-reflogs --unreachable.",
+    "Inspect the dangling commit with git show."
+  ],
+  "23": [
+    "Follow sourceMappingURL.",
+    "Inspect sourcesContent in the map.",
+    "Decode the embedded Base64."
+  ],
+  "24": [
+    "Find the prefix in the BGP snapshot.",
+    "Match it to the RDAP object.",
+    "Read the organization name."
+  ],
+  "25": [
+    "Inspect MBOX message headers.",
+    "Find X-Northpier-Record.",
+    "Decode Base64."
+  ],
+  "26": [
+    "The same XOR key stream was reused.",
+    "XOR C1 with known plaintext.",
+    "XOR C2 with recovered key bytes."
+  ],
+  "27": [
+    "Start with the 02:17 journal entry.",
+    "Follow timer to service to EnvironmentFile.",
+    "Decode the variable."
+  ],
+  "28": [
+    "Use Audacity Spectrogram view.",
+    "Set linear scale and 1\u20133.5 kHz.",
+    "Read the 5\u00d77 letters."
+  ],
+  "29": [
+    "Filter TLS ClientHello.",
+    "Expand server_name SNI extension.",
+    "Read the hostname."
+  ],
+  "30": [
+    "Choose any three distinct shares.",
+    "Interpolate each byte at x=0 modulo p.",
+    "Try another triple to confirm."
+  ],
+  "31": [
+    "The files are XML exports, not EVTX.",
+    "Match LogonId 0x77A1.",
+    "Decode Base64 as UTF-16LE."
+  ]
+}

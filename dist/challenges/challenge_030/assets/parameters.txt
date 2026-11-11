@@ -1,0 +1,3 @@
+Threshold: 3 of 5
+Prime modulus p: 170141183460469231731687303715884105727
+Each byte is the constant term of an independent degree-2 polynomial. Each share row contains one y-coordinate per byte.

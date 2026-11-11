@@ -1,0 +1,23 @@
+APPLICATION EVIDENCE INTAKE
+Evidence ID: WB-10-A
+Application: North Pier Records / Public Mirror
+Build: 1.8.2
+Access mode: Read-only portal
+Recovered files:
+- index.html
+- archive.css
+- archive.js
+- entries/00.json through entries/18.json
+
+Initial observations:
+- Opening the portal displays an ordinary public archive entry.
+- The page refreshes the active entry without requiring a new login.
+- The interface says the active slot is maintained by the browser.
+- The site uses a browser cookie for the slot selection.
+
+Suggested examination:
+1. Open browser developer tools.
+2. Inspect the site's Cookies storage.
+3. Identify the numeric record-selection cookie.
+4. Change its value and refresh the portal.
+5. Check whether a restricted entry can be retrieved.

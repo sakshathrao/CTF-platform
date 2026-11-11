@@ -1,0 +1,15 @@
+DIGITAL EVIDENCE INTAKE
+Evidence ID: WEB-03-A
+Recovered application: Northstar Archive / Operations Bulletin
+Build label visible in page footer: 2.8.14
+Files supplied:
+- index.html
+- css/field-notes.css
+- js/portal.js
+
+The browser renders a combined page, but the original site was delivered as separate client-side files.
+
+Initial triage did not identify the deployment marker in visible page text.
+
+Suggested direction:
+Review the raw HTML source and inspect the resources linked by the page. Browser comments and source files are part of the material sent to every visitor.

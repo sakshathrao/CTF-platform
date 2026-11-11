@@ -140,29 +140,60 @@ try {
     console.warn("Could not sync has_logged_in:", err.message);
 }
 
-// Seed any challenges from challenges.js missing from the database
+// Authoritative Challenge Flags & Categories Seeding (Challenges 001-031)
+const AUTHORITATIVE_CHALLENGES = [
+  { id: 1, category: "OSINT", flag: "CTF{c2005_16_20}" },
+  { id: 2, category: "Forensics", flag: "CTF{follow_the_stream_01}" },
+  { id: 3, category: "Web", flag: "CTF{look_beyond_rendered_pages_inspect_the_sources}" },
+  { id: 4, category: "Forensics", flag: "CTF{restore_the_header_04}" },
+  { id: 5, category: "Cryptography", flag: "CTF{the_key_was_in_plain_sight_05}" },
+  { id: 6, category: "Reverse Engineering", flag: "CTF{trace_the_check_06}" },
+  { id: 7, category: "Linux", flag: "CTF{dotfiles_are_still_files_07}" },
+  { id: 8, category: "Steganography", flag: "CTF{the_red_tag_marks_the_secret_08}" },
+  { id: 9, category: "Multi-stage", flag: "CTF{follow_each_layer_09}" },
+  { id: 10, category: "Web", flag: "CTF{cookies_are_client_controlled_10}" },
+  { id: 11, category: "Forensics", flag: "CTF{files.northpier.example_20251014_2142}" },
+  { id: 12, category: "Cryptography", flag: "CTF{the_old_code_still_turns_12}" },
+  { id: 13, category: "OSINT", flag: "CTF{19980119015021}" },
+  { id: 14, category: "Network Analysis", flag: "CTF{txt_records_tell_the_story_14}" },
+  { id: 15, category: "Network Analysis", flag: "CTF{mac_66}" },
+  { id: 16, category: "Web", flag: "CTF{the_crawler_found_the_gap_16}" },
+  { id: 17, category: "Forensics", flag: "CTF{redaction_is_not_deletion_17}" },
+  { id: 18, category: "Forensics", flag: "CTF{the_operator_called_at_dawn_18}" },
+  { id: 19, category: "Cryptography", flag: "CTF{small_exponent_big_mistake_19}" },
+  { id: 20, category: "Reverse Engineering", flag: "CTF{diagnostic_mode_reveals_all_20}" },
+  { id: 21, category: "Linux", flag: "CTF{the_worker_left_its_environment_21}" },
+  { id: 22, category: "Forensics", flag: "CTF{unreachable_does_not_mean_deleted_22}" },
+  { id: 23, category: "Web", flag: "CTF{the_map_remembers_the_source_23}" },
+  { id: 24, category: "OSINT", flag: "CTF{github_as36459}" },
+  { id: 25, category: "Forensics", flag: "CTF{the_header_holds_the_fragment_25}" },
+  { id: 26, category: "Cryptography", flag: "CTF{never_reuse_a_one_time_pad_26}" },
+  { id: 27, category: "Linux", flag: "CTF{the_timer_woke_the_worker_27}" },
+  { id: 28, category: "Steganography", flag: "CTF{north_pier}" },
+  { id: 29, category: "Network Analysis", flag: "CTF{vault_northpier_example}" },
+  { id: 30, category: "Cryptography", flag: "CTF{three_shares_open_the_cabinet_30}" },
+  { id: 31, category: "Forensics", flag: "CTF{the_logon_started_the_process_31}" }
+];
+
 try {
-    const existingChallenges = new Set(
-        db.prepare("SELECT id FROM challenges").all().map(c => c.id)
-    );
-    const insertChallenge = db.prepare(
-        "INSERT INTO challenges (id, flag, solve_count, category) VALUES (?, ?, 0, ?)"
-    );
-    const updateCategory = db.prepare(
-        "UPDATE challenges SET category = ? WHERE id = ?"
-    );
+    const upsertStmt = db.prepare(`
+        INSERT INTO challenges (id, flag, solve_count, category)
+        VALUES (?, ?, 0, ?)
+        ON CONFLICT(id) DO UPDATE SET flag = excluded.flag, category = excluded.category
+    `);
+    db.exec("BEGIN IMMEDIATE");
+    for (const r of AUTHORITATIVE_CHALLENGES) {
+        upsertStmt.run(r.id, r.flag, r.category);
+    }
     for (const c of challenges) {
-        if (!existingChallenges.has(c.id)) {
-            insertChallenge.run(c.id, c.flag ?? null, c.category || "General");
-        } else {
-            updateCategory.run(c.category || "General", c.id);
-            if (c.flag) {
-                db.prepare("UPDATE challenges SET flag = ? WHERE id = ?").run(c.flag, c.id);
-            }
+        if (!AUTHORITATIVE_CHALLENGES.some(a => a.id === c.id)) {
+            upsertStmt.run(c.id, c.flag ?? null, c.category || "General");
         }
     }
+    db.exec("COMMIT");
 } catch (err) {
-    console.warn("Could not sync challenges:", err.message);
+    try { db.exec("ROLLBACK"); } catch {}
+    console.warn("Could not sync authoritative challenges:", err.message);
 }
 
 // Admin Token: environment variable or random secure token
@@ -2198,13 +2229,38 @@ const server =
                     }
                 }
 
-                // Auto-sync missing runtime assets (node_modules or images) if staticDir is dist
+                // Fallback for /public/... prefix requests
+                if (!existsSync(resolvedPath) && cleanPath.startsWith("public/")) {
+                    const stripped = cleanPath.slice("public/".length);
+                    const candidate1 = path.resolve(path.join(staticDir, stripped));
+                    const candidate2 = path.resolve(path.join(__dirname, stripped));
+                    if (existsSync(candidate1)) {
+                        resolvedPath = candidate1;
+                    } else if (existsSync(candidate2)) {
+                        resolvedPath = candidate2;
+                    }
+                }
+
+                // Fallback for public assets / challenges when running from __dirname or dist
+                if (!existsSync(resolvedPath)) {
+                    const publicCandidate = path.resolve(path.join(__dirname, "public", cleanPath));
+                    const rootCandidate = path.resolve(path.join(__dirname, cleanPath));
+                    if (existsSync(publicCandidate)) {
+                        resolvedPath = publicCandidate;
+                    } else if (existsSync(rootCandidate)) {
+                        resolvedPath = rootCandidate;
+                    }
+                }
+
+                // Auto-sync missing runtime assets (node_modules, images, assets, challenges) if staticDir is dist
                 if (!existsSync(resolvedPath) && staticDir === distDir) {
                     let sourcePath = null;
                     if (cleanPath.startsWith("node_modules/")) {
                         sourcePath = path.resolve(path.join(__dirname, cleanPath));
-                    } else if (cleanPath.startsWith("images/")) {
-                        sourcePath = path.resolve(path.join(__dirname, "public", cleanPath));
+                    } else if (cleanPath.startsWith("images/") || cleanPath.startsWith("assets/") || cleanPath.startsWith("challenges/")) {
+                        const inPublic = path.resolve(path.join(__dirname, "public", cleanPath));
+                        const inRoot = path.resolve(path.join(__dirname, cleanPath));
+                        sourcePath = existsSync(inPublic) ? inPublic : (existsSync(inRoot) ? inRoot : null);
                     }
                     const rootDir = path.resolve(__dirname);
                     if (sourcePath && (sourcePath.startsWith(rootDir + path.sep) || sourcePath === rootDir) && existsSync(sourcePath)) {
@@ -2215,7 +2271,11 @@ const server =
                     }
                 }
 
-                if ((resolvedPath.startsWith(resolvedStatic + path.sep) || resolvedPath === resolvedStatic) && existsSync(resolvedPath)) {
+                const resolvedRoot = path.resolve(__dirname);
+                const isUnderStatic = resolvedPath.startsWith(resolvedStatic + path.sep) || resolvedPath === resolvedStatic;
+                const isUnderRoot = resolvedPath.startsWith(resolvedRoot + path.sep) || resolvedPath === resolvedRoot;
+
+                if ((isUnderStatic || isUnderRoot) && existsSync(resolvedPath)) {
                     try {
                         const stats = statSync(resolvedPath);
                         if (!stats.isDirectory()) {
@@ -2236,7 +2296,18 @@ const server =
                                 ".wasm": "application/wasm",
                                 ".bin": "application/octet-stream",
                                 ".img": "application/octet-stream",
-                                ".iso": "application/x-iso9660-image"
+                                ".iso": "application/x-iso9660-image",
+                                ".pcap": "application/vnd.tcpdump.pcap",
+                                ".pdf": "application/pdf",
+                                ".wav": "audio/wav",
+                                ".zip": "application/zip",
+                                ".tar": "application/x-tar",
+                                ".gz": "application/gzip",
+                                ".txt": "text/plain; charset=utf-8",
+                                ".csv": "text/csv; charset=utf-8",
+                                ".py": "text/x-python; charset=utf-8",
+                                ".mbox": "application/mbox",
+                                ".map": "application/json"
                             };
                             const contentType = MIME_TYPES[ext] || "application/octet-stream";
 
@@ -2301,8 +2372,8 @@ const server =
                                 res.setHeader("Cache-Control", "public, max-age=3600");
                             }
 
+                            res.setHeader("Content-Length", statSync(servePath).size);
                             if (req.method === "HEAD") {
-                                res.setHeader("Content-Length", statSync(servePath).size);
                                 res.writeHead(200);
                                 res.end();
                                 return;

@@ -1,0 +1,35 @@
+-- Authoritative Server-Side Flags for North Pier CTF Challenges 001–031
+-- Compatible with sakshathrao/CTF-platform SQLite schema: challenges(id, solve_count, flag, category)
+BEGIN TRANSACTION;
+INSERT INTO challenges (id, flag, solve_count, category) VALUES (1, 'CTF{c2005_16_20}', 0, 'OSINT') ON CONFLICT(id) DO UPDATE SET flag = excluded.flag, category = excluded.category;
+INSERT INTO challenges (id, flag, solve_count, category) VALUES (2, 'CTF{follow_the_stream_01}', 0, 'Forensics') ON CONFLICT(id) DO UPDATE SET flag = excluded.flag, category = excluded.category;
+INSERT INTO challenges (id, flag, solve_count, category) VALUES (3, 'CTF{look_beyond_rendered_pages_inspect_the_sources}', 0, 'Web') ON CONFLICT(id) DO UPDATE SET flag = excluded.flag, category = excluded.category;
+INSERT INTO challenges (id, flag, solve_count, category) VALUES (4, 'CTF{restore_the_header_04}', 0, 'Forensics') ON CONFLICT(id) DO UPDATE SET flag = excluded.flag, category = excluded.category;
+INSERT INTO challenges (id, flag, solve_count, category) VALUES (5, 'CTF{the_key_was_in_plain_sight_05}', 0, 'Cryptography') ON CONFLICT(id) DO UPDATE SET flag = excluded.flag, category = excluded.category;
+INSERT INTO challenges (id, flag, solve_count, category) VALUES (6, 'CTF{trace_the_check_06}', 0, 'Reverse Engineering') ON CONFLICT(id) DO UPDATE SET flag = excluded.flag, category = excluded.category;
+INSERT INTO challenges (id, flag, solve_count, category) VALUES (7, 'CTF{dotfiles_are_still_files_07}', 0, 'Linux') ON CONFLICT(id) DO UPDATE SET flag = excluded.flag, category = excluded.category;
+INSERT INTO challenges (id, flag, solve_count, category) VALUES (8, 'CTF{the_red_tag_marks_the_secret_08}', 0, 'Steganography') ON CONFLICT(id) DO UPDATE SET flag = excluded.flag, category = excluded.category;
+INSERT INTO challenges (id, flag, solve_count, category) VALUES (9, 'CTF{follow_each_layer_09}', 0, 'Multi-stage') ON CONFLICT(id) DO UPDATE SET flag = excluded.flag, category = excluded.category;
+INSERT INTO challenges (id, flag, solve_count, category) VALUES (10, 'CTF{cookies_are_client_controlled_10}', 0, 'Web') ON CONFLICT(id) DO UPDATE SET flag = excluded.flag, category = excluded.category;
+INSERT INTO challenges (id, flag, solve_count, category) VALUES (11, 'CTF{files.northpier.example_20251014_2142}', 0, 'Forensics') ON CONFLICT(id) DO UPDATE SET flag = excluded.flag, category = excluded.category;
+INSERT INTO challenges (id, flag, solve_count, category) VALUES (12, 'CTF{the_old_code_still_turns_12}', 0, 'Cryptography') ON CONFLICT(id) DO UPDATE SET flag = excluded.flag, category = excluded.category;
+INSERT INTO challenges (id, flag, solve_count, category) VALUES (13, 'CTF{19980119015021}', 0, 'OSINT') ON CONFLICT(id) DO UPDATE SET flag = excluded.flag, category = excluded.category;
+INSERT INTO challenges (id, flag, solve_count, category) VALUES (14, 'CTF{txt_records_tell_the_story_14}', 0, 'Network Analysis') ON CONFLICT(id) DO UPDATE SET flag = excluded.flag, category = excluded.category;
+INSERT INTO challenges (id, flag, solve_count, category) VALUES (15, 'CTF{mac_66}', 0, 'Network Analysis') ON CONFLICT(id) DO UPDATE SET flag = excluded.flag, category = excluded.category;
+INSERT INTO challenges (id, flag, solve_count, category) VALUES (16, 'CTF{the_crawler_found_the_gap_16}', 0, 'Web') ON CONFLICT(id) DO UPDATE SET flag = excluded.flag, category = excluded.category;
+INSERT INTO challenges (id, flag, solve_count, category) VALUES (17, 'CTF{redaction_is_not_deletion_17}', 0, 'Forensics') ON CONFLICT(id) DO UPDATE SET flag = excluded.flag, category = excluded.category;
+INSERT INTO challenges (id, flag, solve_count, category) VALUES (18, 'CTF{the_operator_called_at_dawn_18}', 0, 'Forensics') ON CONFLICT(id) DO UPDATE SET flag = excluded.flag, category = excluded.category;
+INSERT INTO challenges (id, flag, solve_count, category) VALUES (19, 'CTF{small_exponent_big_mistake_19}', 0, 'Cryptography') ON CONFLICT(id) DO UPDATE SET flag = excluded.flag, category = excluded.category;
+INSERT INTO challenges (id, flag, solve_count, category) VALUES (20, 'CTF{diagnostic_mode_reveals_all_20}', 0, 'Reverse Engineering') ON CONFLICT(id) DO UPDATE SET flag = excluded.flag, category = excluded.category;
+INSERT INTO challenges (id, flag, solve_count, category) VALUES (21, 'CTF{the_worker_left_its_environment_21}', 0, 'Linux') ON CONFLICT(id) DO UPDATE SET flag = excluded.flag, category = excluded.category;
+INSERT INTO challenges (id, flag, solve_count, category) VALUES (22, 'CTF{unreachable_does_not_mean_deleted_22}', 0, 'Forensics') ON CONFLICT(id) DO UPDATE SET flag = excluded.flag, category = excluded.category;
+INSERT INTO challenges (id, flag, solve_count, category) VALUES (23, 'CTF{the_map_remembers_the_source_23}', 0, 'Web') ON CONFLICT(id) DO UPDATE SET flag = excluded.flag, category = excluded.category;
+INSERT INTO challenges (id, flag, solve_count, category) VALUES (24, 'CTF{github_as36459}', 0, 'OSINT') ON CONFLICT(id) DO UPDATE SET flag = excluded.flag, category = excluded.category;
+INSERT INTO challenges (id, flag, solve_count, category) VALUES (25, 'CTF{the_header_holds_the_fragment_25}', 0, 'Forensics') ON CONFLICT(id) DO UPDATE SET flag = excluded.flag, category = excluded.category;
+INSERT INTO challenges (id, flag, solve_count, category) VALUES (26, 'CTF{never_reuse_a_one_time_pad_26}', 0, 'Cryptography') ON CONFLICT(id) DO UPDATE SET flag = excluded.flag, category = excluded.category;
+INSERT INTO challenges (id, flag, solve_count, category) VALUES (27, 'CTF{the_timer_woke_the_worker_27}', 0, 'Linux') ON CONFLICT(id) DO UPDATE SET flag = excluded.flag, category = excluded.category;
+INSERT INTO challenges (id, flag, solve_count, category) VALUES (28, 'CTF{north_pier}', 0, 'Steganography') ON CONFLICT(id) DO UPDATE SET flag = excluded.flag, category = excluded.category;
+INSERT INTO challenges (id, flag, solve_count, category) VALUES (29, 'CTF{vault_northpier_example}', 0, 'Network Analysis') ON CONFLICT(id) DO UPDATE SET flag = excluded.flag, category = excluded.category;
+INSERT INTO challenges (id, flag, solve_count, category) VALUES (30, 'CTF{three_shares_open_the_cabinet_30}', 0, 'Cryptography') ON CONFLICT(id) DO UPDATE SET flag = excluded.flag, category = excluded.category;
+INSERT INTO challenges (id, flag, solve_count, category) VALUES (31, 'CTF{the_logon_started_the_process_31}', 0, 'Forensics') ON CONFLICT(id) DO UPDATE SET flag = excluded.flag, category = excluded.category;
+COMMIT;

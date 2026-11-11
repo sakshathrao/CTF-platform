@@ -1,0 +1,29 @@
+CHALLENGE 011 — READY-TO-RUN SQLITE QUERY
+THE LAST DOWNLOAD / CHROMIUM HISTORY
+
+Open a terminal in the folder containing the `History` database.
+
+Inspect the schema:
+  sqlite3 History ".schema downloads"
+
+Run the target query:
+  sqlite3 -header -column History "
+  SELECT
+      target_path,
+      tab_url,
+      datetime(start_time / 1000000 - 11644473600, 'unixepoch') AS start_utc
+  FROM downloads
+  WHERE target_path LIKE '%northpier_manifest.csv%';
+  "
+
+The columns mean:
+- target_path: confirms the requested file
+- tab_url: source page that initiated the download
+- start_utc: UTC time at which the download started
+
+Chromium stores `start_time` as microseconds since 1601-01-01 UTC.
+The conversion formula is:
+  datetime(start_time / 1000000 - 11644473600, 'unixepoch')
+
+Normalize the UTC timestamp as YYYYMMDD_HHMM.
+Use only the hostname from tab_url (lowercase; no scheme or path).

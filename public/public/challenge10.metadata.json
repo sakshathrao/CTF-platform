@@ -1,0 +1,24 @@
+{
+  "id": 10,
+  "title": "The Forgotten Cookie",
+  "category": "Web",
+  "difficulty": "Easy-Medium",
+  "points": 125,
+  "type": "static_web_cookie_manipulation",
+  "requires_internet": false,
+  "inspiration": {
+    "challenge": "Cookies",
+    "platform": "picoCTF",
+    "references": [
+      "https://ctfdojo.com/writeups/picoctf-cookies-writeup",
+      "https://picoctfsolutions.com/picoctf-2021-cookies",
+      "https://hackblue.org/learn/ctf-web-challenge-methodology"
+    ]
+  },
+  "asset_directory": "public/challenges/web_002/",
+  "flag_format": "CTF{...}",
+  "platform_submission": "POST /solve",
+  "lesson_type": "intentional_client_side_data_exposure",
+  "security_scope": "Static JSON records are public resources. The cookie is only a client-side record selector, not an authorization control.",
+  "audit_clarification": "The restricted JSON is intentionally public as evidence of the client-side exposure; participants must demonstrate why a cookie selector is not access control."
+}

@@ -1,0 +1,18 @@
+CRYPTOGRAPHIC EVIDENCE INTAKE
+Case: CR-12
+Evidence ID: CR-12-A
+File format: PNG scan + UTF-8 transcription
+Acquisition: North Pier telegraph desk
+Integrity: scan and text transcription agree
+
+Initial observations:
+- The message uses alphabetic substitution rather than a single fixed shift.
+- The operator memo identifies a repeating word.
+- Non-letter characters (braces, underscores and digits) were retained as transmitted.
+- The same repeating key is applied only to letters.
+
+Suggested analysis:
+1. Normalize the station call-sign by removing spaces.
+2. Identify the repeating-key alphabetic cipher.
+3. Decrypt the message using the key.
+4. Preserve punctuation and digits exactly.

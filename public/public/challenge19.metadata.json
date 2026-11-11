@@ -1,0 +1,10 @@
+{
+  "id": 19,
+  "title": "The Small Exponent",
+  "category": "Cryptography",
+  "difficulty": "Medium",
+  "points": 150,
+  "type": "static",
+  "requires_internet": false,
+  "flag_format": "CTF{...}"
+}

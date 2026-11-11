@@ -1,0 +1,7 @@
+{
+  "slot": 18,
+  "classification": "RESTRICTED",
+  "title": "Unreleased Recovery Bulletin",
+  "body": "The archive export queue contains a restricted bulletin. Recovery marker: CTF{cookies_are_client_controlled_10}",
+  "status": "restricted"
+}

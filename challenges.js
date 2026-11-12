@@ -1,5 +1,7 @@
 // CTF Platform Challenge Registry (Challenges 001–031)
 // Adapted for sakshathrao/CTF-platform (development branch)
+import { challenges032To042 } from "./challenges_032_042.js";
+
 export const challenges = [
   {
     title: "The Excellent One",
@@ -249,6 +251,7 @@ export const challenges = [
     link: "challenge31.html",
     points: 125,
   },
+  ...challenges032To042,
 ];
 
 export function getVisibleChallenges(allChallenges = challenges, solvedIds = new Set()) {

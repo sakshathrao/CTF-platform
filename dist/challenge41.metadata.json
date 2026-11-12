@@ -1,0 +1,16 @@
+{
+  "id": 41,
+  "title": "Trace the Script",
+  "category": "Reverse Engineering & Shell Debugging",
+  "difficulty": "Easy",
+  "points": 100,
+  "slug": "trace-the-script",
+  "summary": "A maintenance script prints only a generic status message. Trace its execution in the shell to understand how its output is assembled.",
+  "objective": "Run TRACE.SH with shell tracing enabled and recover the token assembled from the two local fragments.",
+  "runtime": "v86 Local Browser VM",
+  "kind": "dynamic_vm",
+  "network": "disabled",
+  "boot": "platform customBzImage",
+  "evidence": "read-only ISO9660 CD-ROM",
+  "iso": "/challenges/vm_041/challenge41.iso"
+}

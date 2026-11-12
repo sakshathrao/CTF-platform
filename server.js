@@ -12,6 +12,7 @@ import WebSocket, {
 } from "ws";
 
 import { challenges, getVisibleChallenges } from "./challenges.js";
+import { CHALLENGE_FLAGS_032_042 } from "./.server-private/challenge_flags_032_042.js";
 
 
 // ============================================================
@@ -175,6 +176,7 @@ const AUTHORITATIVE_CHALLENGES = [
   { id: 30, category: "Cryptography", flag: "CTF{three_shares_open_the_cabinet_30}" },
   { id: 31, category: "Forensics", flag: "CTF{the_logon_started_the_process_31}" }
 ];
+AUTHORITATIVE_CHALLENGES.push(...CHALLENGE_FLAGS_032_042);
 
 try {
     const upsertStmt = db.prepare(`
@@ -2321,7 +2323,7 @@ const server =
                     let sourcePath = null;
                     if (cleanPath.startsWith("node_modules/")) {
                         sourcePath = path.resolve(path.join(__dirname, cleanPath));
-                    } else if (cleanPath.startsWith("images/") || cleanPath.startsWith("assets/") || cleanPath.startsWith("challenges/")) {
+                    } else if (cleanPath.startsWith("images/") || cleanPath.startsWith("assets/") || cleanPath.startsWith("challenges/") || cleanPath.startsWith("dynamic-vm/")) {
                         const inPublic = path.resolve(path.join(__dirname, "public", cleanPath));
                         const inRoot = path.resolve(path.join(__dirname, cleanPath));
                         sourcePath = existsSync(inPublic) ? inPublic : (existsSync(inRoot) ? inRoot : null);

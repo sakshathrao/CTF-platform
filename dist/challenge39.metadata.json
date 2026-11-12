@@ -1,0 +1,16 @@
+{
+  "id": 39,
+  "title": "The Shifted Memo",
+  "category": "Cryptography & Encoding",
+  "difficulty": "Easy",
+  "points": 75,
+  "slug": "the-shifted-memo",
+  "summary": "A short memo was encoded with a letter-shifting cipher. Reverse the shift using a standard text filter.",
+  "objective": "Decode MEMO.ROT using the provided ROT13 clue and submit the token.",
+  "runtime": "v86 Local Browser VM",
+  "kind": "dynamic_vm",
+  "network": "disabled",
+  "boot": "platform customBzImage",
+  "evidence": "read-only ISO9660 CD-ROM",
+  "iso": "/challenges/vm_039/challenge39.iso"
+}

@@ -1,0 +1,16 @@
+{
+  "id": 42,
+  "title": "The Process Trail",
+  "category": "Linux Process Investigation",
+  "difficulty": "Easy\u2013Medium",
+  "points": 100,
+  "slug": "the-process-trail",
+  "summary": "A maintenance host was investigated after an unexpected background job ran. Use the saved process snapshot and process details to identify the worker\u2019s ticket argument.",
+  "objective": "Find the report-sync process in PS.LOG, inspect its matching process record and submit the ticket value.",
+  "runtime": "v86 Local Browser VM",
+  "kind": "dynamic_vm",
+  "network": "disabled",
+  "boot": "platform customBzImage",
+  "evidence": "read-only ISO9660 CD-ROM",
+  "iso": "/challenges/vm_042/challenge42.iso"
+}

@@ -1,0 +1,16 @@
+{
+  "id": 32,
+  "title": "The Vanishing Layer",
+  "category": "Digital Forensics",
+  "difficulty": "Intermediate",
+  "points": 150,
+  "runtime": "v86 Local Browser VM",
+  "kind": "dynamic_vm",
+  "objectives": [
+    "Inspect a Docker image export from a Linux terminal",
+    "Read the manifest and preserve filesystem layer order",
+    "Identify a whiteout marker in a later layer",
+    "Recover and decode a configuration value from an earlier layer"
+  ],
+  "reset": "Reloading the challenge page creates a fresh browser-local VM instance."
+}

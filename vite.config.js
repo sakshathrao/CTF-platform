@@ -1,7 +1,7 @@
 import { defineConfig } from "vite";
 
 const challengeInputs = {};
-for (let i = 1; i <= 31; i++) {
+for (let i = 1; i <= 42; i++) {
     challengeInputs[`challenge${i}`] = `challenge${i}.html`;
 }
 
@@ -16,6 +16,11 @@ export default defineConfig({
                 admin: "admin.html",
                 ...challengeInputs,
             },
+        },
+    },
+    server: {
+        fs: {
+            deny: [".env", ".env.*", "*.{crt,pem}", "**/.git/**", "**/.server-private/**"],
         },
     },
 });

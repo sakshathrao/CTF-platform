@@ -1,0 +1,16 @@
+{
+  "id": 37,
+  "title": "The Packed Parcel",
+  "category": "Digital Forensics",
+  "difficulty": "Easy",
+  "points": 75,
+  "slug": "the-packed-parcel",
+  "summary": "A department sent a small archive containing several documents. Inspect the archive, extract it and locate the final handover note.",
+  "objective": "List the archive contents, extract the files into /tmp/parcel, and submit the token in FINAL.TXT.",
+  "runtime": "v86 Local Browser VM",
+  "kind": "dynamic_vm",
+  "network": "disabled",
+  "boot": "platform customBzImage",
+  "evidence": "read-only ISO9660 CD-ROM",
+  "iso": "/challenges/vm_037/challenge37.iso"
+}

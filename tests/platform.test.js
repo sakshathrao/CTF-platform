@@ -1936,3 +1936,160 @@ test("Solve Notification: /solve returns basePoints, bonusPercent, and pointsAwa
     }, { layout: "wait" });
   }
 });
+
+test("Challenges 032-042: Database seeding and challenges registry export all 42 challenges", async () => {
+  const { challenges } = await import("../challenges.js");
+  assert.equal(challenges.length, 42, "Registry contains all 42 challenges");
+
+  const countRow = db.prepare("SELECT COUNT(*) as cnt FROM challenges").get();
+  assert.equal(countRow.cnt, 42, "Database contains all 42 challenges seeded");
+
+  for (let id = 32; id <= 42; id++) {
+    const regCh = challenges.find(c => c.id === id);
+    assert.ok(regCh, `Challenge ${id} exists in registry`);
+    assert.ok(regCh.title, `Challenge ${id} has title`);
+    assert.ok(regCh.category, `Challenge ${id} has category`);
+    assert.ok(typeof regCh.points === "number" && regCh.points > 0, `Challenge ${id} has positive points`);
+
+    const dbCh = db.prepare("SELECT * FROM challenges WHERE id = ?").get(id);
+    assert.ok(dbCh, `Challenge ${id} exists in database`);
+    assert.ok(dbCh.flag && dbCh.flag.startsWith("CTF{"), `Challenge ${id} has valid CTF flag`);
+    assert.equal(dbCh.category, regCh.category, `Challenge ${id} category matches registry`);
+  }
+});
+
+test("Challenges 032-042: ISO and VM static assets served with correct MIME and Range support", async () => {
+  for (let id = 32; id <= 42; id++) {
+    const padded = String(id).padStart(3, "0");
+    const isoRes = await makeRequest("GET", `/challenges/vm_${padded}/challenge${id}.iso`);
+    assert.equal(isoRes.statusCode, 200, `Challenge ${id} ISO returns 200`);
+    assert.equal(isoRes.headers["content-type"], "application/x-iso9660-image", `Challenge ${id} ISO has correct MIME type`);
+    assert.equal(isoRes.headers["accept-ranges"], "bytes", `Challenge ${id} ISO supports byte ranges`);
+    assert.ok(Number(isoRes.headers["content-length"]) > 0, `Challenge ${id} ISO is non-empty`);
+  }
+
+  const bzRes = await makeRequest("GET", "/images/customBzImage");
+  assert.equal(bzRes.statusCode, 200, "customBzImage returns 200");
+  assert.ok(Number(bzRes.headers["content-length"]) > 0, "customBzImage is non-empty");
+
+  const commonRes = await makeRequest("GET", "/dynamic-vm/common.js");
+  assert.equal(commonRes.statusCode, 200, "dynamic-vm/common.js returns 200");
+  assert.ok(commonRes.headers["content-type"]?.includes("javascript"), "common.js has javascript MIME type");
+  assert.ok(commonRes.body.includes("activeNotifyKeys"), "common.js contains notify deduplication logic");
+});
+
+test("Challenges 032-042: Clean URL routing resolves /challenge32 through /challenge42", async () => {
+  for (let id = 32; id <= 42; id++) {
+    const res = await makeRequest("GET", `/challenge${id}`);
+    assert.equal(res.statusCode, 200, `/challenge${id} clean URL resolves with 200`);
+    assert.ok(res.headers["content-type"]?.includes("text/html"), `/challenge${id} returns HTML`);
+    assert.ok(res.body.includes("NP_VM_CHALLENGE"), `/challenge${id} defines NP_VM_CHALLENGE`);
+    assert.ok(new RegExp(`"id":\\s*${id}\\b`).test(res.body), `/challenge${id} config matches challenge id ${id}`);
+  }
+});
+
+test("Challenges 032-042: Sensitive .server-private directory returns HTTP 403 Forbidden", async () => {
+  const flagFileRes = await makeRequest("GET", "/.server-private/challenge_flags_032_042.js");
+  assert.equal(flagFileRes.statusCode, 403, "Direct request to .server-private JS flags returns 403");
+
+  const sqlFileRes = await makeRequest("GET", "/.server-private/set_flags_032_042.sql");
+  assert.equal(sqlFileRes.statusCode, 403, "Direct request to .server-private SQL file returns 403");
+});
+
+test("Challenges 032-042: Serial progression and solve verification in Digital Forensics (32 -> 36 -> 37)", async () => {
+  await makeRequest("POST", "/admin/state", {
+    "Content-Type": "application/json",
+    "X-Admin-Token": TEST_ADMIN_TOKEN
+  }, { layout: "start" });
+
+  const teamName = `VMProgTeam_${Date.now()}`;
+  const regRes = await makeRequest("POST", "/register", {
+    "Content-Type": "application/json"
+  }, {
+    teamName,
+    password: "password123",
+    members: [{ name: "VM Member", usn: `VM${Date.now().toString().slice(-8)}` }]
+  });
+  assert.equal(regRes.statusCode, 201, "Registration succeeds");
+  const cookie = regRes.headers["set-cookie"]?.[0]?.split(";")[0];
+
+  try {
+    // Reset solve counts for 32, 36, 37
+    db.prepare("UPDATE challenges SET solve_count = 0 WHERE id IN (32, 36, 37)").run();
+    db.prepare("DELETE FROM solves WHERE challenge_id IN (32, 36, 37)").run();
+
+    // Challenge 36 and 37 should initially be locked (403)
+    const locked36 = await makeRequest("POST", "/solve", {
+      "Content-Type": "application/json",
+      "Cookie": cookie
+    }, {
+      challengeId: 36,
+      flag: "CTF{192.0.2.77}"
+    });
+    assert.equal(locked36.statusCode, 403, "Challenge 36 is locked prior to solving 32");
+
+    // Solve Challenge 32 (Digital Forensics, 150 base pts, 0 previous solves -> First Blood 130% = 195 pts)
+    const solve32 = await makeRequest("POST", "/solve", {
+      "Content-Type": "application/json",
+      "Cookie": cookie
+    }, {
+      challengeId: 32,
+      flag: "CTF{whiteouts_are_not_secure_deletes}"
+    });
+    assert.equal(solve32.statusCode, 200, "Challenge 32 solve succeeds");
+    const body32 = JSON.parse(solve32.body);
+    assert.equal(body32.success, true);
+    assert.equal(body32.basePoints, 150);
+    assert.equal(body32.bonusPercent, 30);
+    assert.equal(body32.pointsAwarded, 195);
+    assert.equal(body32.totalPoints, 195);
+
+    // Challenge 37 should still be locked because 36 is next in category
+    const locked37 = await makeRequest("POST", "/solve", {
+      "Content-Type": "application/json",
+      "Cookie": cookie
+    }, {
+      challengeId: 37,
+      flag: "CTF{parcel_checked}"
+    });
+    assert.equal(locked37.statusCode, 403, "Challenge 37 is locked prior to solving 36");
+
+    // Solve Challenge 36 (Digital Forensics, 75 base pts, First Blood 130%)
+    const solve36 = await makeRequest("POST", "/solve", {
+      "Content-Type": "application/json",
+      "Cookie": cookie
+    }, {
+      challengeId: 36,
+      flag: "CTF{192.0.2.77}"
+    });
+    assert.equal(solve36.statusCode, 200, "Challenge 36 solve succeeds");
+    const body36 = JSON.parse(solve36.body);
+    assert.equal(body36.success, true);
+    assert.equal(body36.basePoints, 75);
+
+    // Now Challenge 37 is unlocked. Solve Challenge 37 (Digital Forensics, 75 base pts)
+    const solve37 = await makeRequest("POST", "/solve", {
+      "Content-Type": "application/json",
+      "Cookie": cookie
+    }, {
+      challengeId: 37,
+      flag: "CTF{parcel_checked}"
+    });
+    assert.equal(solve37.statusCode, 200, "Challenge 37 solve succeeds");
+    const body37 = JSON.parse(solve37.body);
+    assert.equal(body37.success, true);
+    assert.equal(body37.basePoints, 75);
+
+    // Verify all 3 solves recorded in database
+    const dbSolves = db.prepare("SELECT challenge_id FROM solves WHERE team_name = ? ORDER BY challenge_id").all(teamName);
+    assert.deepEqual(dbSolves.map(r => r.challenge_id), [32, 36, 37], "All 3 solves recorded in DB");
+  } finally {
+    db.prepare("DELETE FROM solves WHERE team_name = ?").run(teamName);
+    db.prepare("DELETE FROM sessions WHERE team_name = ?").run(teamName);
+    db.prepare("DELETE FROM teams WHERE name = ?").run(teamName);
+    await makeRequest("POST", "/admin/state", {
+      "Content-Type": "application/json",
+      "X-Admin-Token": TEST_ADMIN_TOKEN
+    }, { layout: "wait" });
+  }
+});

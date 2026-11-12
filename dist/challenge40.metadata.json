@@ -1,0 +1,16 @@
+{
+  "id": 40,
+  "title": "The Quiet DNS",
+  "category": "Network Forensics",
+  "difficulty": "Easy",
+  "points": 100,
+  "slug": "the-quiet-dns",
+  "summary": "A workstation made several DNS requests before disconnecting. Compare its request log with the approved internal host list and identify the unexpected hostname.",
+  "objective": "Find the DNS query for a hostname that is not in ALLOW.TXT and submit that hostname inside the flag format.",
+  "runtime": "v86 Local Browser VM",
+  "kind": "dynamic_vm",
+  "network": "disabled",
+  "boot": "platform customBzImage",
+  "evidence": "read-only ISO9660 CD-ROM",
+  "iso": "/challenges/vm_040/challenge40.iso"
+}

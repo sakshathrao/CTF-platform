@@ -1,0 +1,16 @@
+{
+  "id": 34,
+  "title": "Permission Check",
+  "category": "Linux Fundamentals",
+  "difficulty": "Easy",
+  "points": 75,
+  "slug": "permission-check",
+  "summary": "An audit copy has to follow a simple access policy. Use the console to apply the requested permissions to a writable copy and verify the resulting mode.",
+  "objective": "Apply the policy to a copy of REPORT.TXT in /tmp, verify the mode, and submit the numeric permission code shown by your work.",
+  "runtime": "v86 Local Browser VM",
+  "kind": "dynamic_vm",
+  "network": "disabled",
+  "boot": "platform customBzImage",
+  "evidence": "read-only ISO9660 CD-ROM",
+  "iso": "/challenges/vm_034/challenge34.iso"
+}

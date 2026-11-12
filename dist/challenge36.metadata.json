@@ -1,0 +1,16 @@
+{
+  "id": 36,
+  "title": "The Night Shift Log",
+  "category": "Digital Forensics",
+  "difficulty": "Easy",
+  "points": 75,
+  "slug": "the-night-shift-log",
+  "summary": "A server administrator reported unusual sign-ins during the night. Filter the authentication log and identify the source address of the successful backup login.",
+  "objective": "Find the successful backup-service login after 02:00 and submit the source IP address inside the flag format.",
+  "runtime": "v86 Local Browser VM",
+  "kind": "dynamic_vm",
+  "network": "disabled",
+  "boot": "platform customBzImage",
+  "evidence": "read-only ISO9660 CD-ROM",
+  "iso": "/challenges/vm_036/challenge36.iso"
+}

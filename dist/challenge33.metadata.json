@@ -1,0 +1,16 @@
+{
+  "id": 33,
+  "title": "The Hidden Handover",
+  "category": "Linux Fundamentals",
+  "difficulty": "Easy",
+  "points": 50,
+  "slug": "the-hidden-handover",
+  "summary": "A handover note was left somewhere on a retired workstation. Inspect the mounted evidence disc and locate the note that a normal directory listing does not show.",
+  "objective": "Find the hidden handover note on the evidence disc and submit its token.",
+  "runtime": "v86 Local Browser VM",
+  "kind": "dynamic_vm",
+  "network": "disabled",
+  "boot": "platform customBzImage",
+  "evidence": "read-only ISO9660 CD-ROM",
+  "iso": "/challenges/vm_033/challenge33.iso"
+}

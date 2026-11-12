@@ -1,0 +1,16 @@
+{
+  "id": 35,
+  "title": "The Broken Shortcut",
+  "category": "Linux Fundamentals",
+  "difficulty": "Easy",
+  "points": 75,
+  "slug": "the-broken-shortcut",
+  "summary": "A shortcut on a recovered workstation points to a report. Inspect the link and open its target to recover the handover token.",
+  "objective": "Identify where the CURRENT shortcut points, then read the target report and submit its token.",
+  "runtime": "v86 Local Browser VM",
+  "kind": "dynamic_vm",
+  "network": "disabled",
+  "boot": "platform customBzImage",
+  "evidence": "read-only ISO9660 CD-ROM",
+  "iso": "/challenges/vm_035/challenge35.iso"
+}

@@ -1,0 +1,16 @@
+{
+  "id": 38,
+  "title": "The Encoded Dispatch",
+  "category": "Cryptography & Encoding",
+  "difficulty": "Easy",
+  "points": 50,
+  "slug": "the-encoded-dispatch",
+  "summary": "An internal dispatch was saved as Base64 text. Decode the message in the VM and recover its token.",
+  "objective": "Decode MESSAGE.B64 using a command-line utility and submit the token found in the decoded message.",
+  "runtime": "v86 Local Browser VM",
+  "kind": "dynamic_vm",
+  "network": "disabled",
+  "boot": "platform customBzImage",
+  "evidence": "read-only ISO9660 CD-ROM",
+  "iso": "/challenges/vm_038/challenge38.iso"
+}

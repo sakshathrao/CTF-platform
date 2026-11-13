@@ -269,10 +269,15 @@ export function getVisibleChallenges(allChallenges = challenges, solvedIds = new
 
     const visibleSet = new Set();
     for (const [, chList] of categoryMap.entries()) {
-        const solvedCount = chList.filter(c => solvedSet.has(Number(c.id))).length;
-        const countToShow = Math.min(chList.length, 1 + solvedCount);
-        for (let i = 0; i < countToShow; i++) {
-            visibleSet.add(Number(chList[i].id));
+        if (!chList.length) continue;
+        const firstChallenge = chList[0];
+        const isCategoryUnlocked = solvedSet.has(Number(firstChallenge.id)) || chList.some(c => solvedSet.has(Number(c.id)));
+        if (isCategoryUnlocked) {
+            for (const ch of chList) {
+                visibleSet.add(Number(ch.id));
+            }
+        } else {
+            visibleSet.add(Number(firstChallenge.id));
         }
     }
 

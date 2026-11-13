@@ -462,12 +462,12 @@ test("Challenges: each challenge has a category and serial unlocking works per c
     assert.equal(visibleInCat[0].id, catChallenges[0].id, `Category ${cat} shows its first challenge in serial order`);
   }
 
-  // Solve challenge 1 (from OSINT category)
+  // Solve challenge 1 (from OSINT category) -> reveals all questions in OSINT category
   const afterSolve1 = getVisibleChallenges(challenges, new Set([1]));
   const osintVisible = afterSolve1.filter(c => c.category === "OSINT");
-  assert.equal(osintVisible.length, 2, "OSINT category shows an additional challenge after solving 1");
-  assert.equal(osintVisible[0].id, 1);
-  assert.equal(osintVisible[1].id, 13);
+  const allOsint = challenges.filter(c => c.category === "OSINT");
+  assert.equal(osintVisible.length, allOsint.length, "OSINT category shows all challenges after solving initial challenge 1");
+  assert.deepEqual(osintVisible.map(c => c.id), [1, 13, 24]);
 
   // Other categories must still show only 1 challenge
   for (const cat of categories.filter(c => c !== "OSINT")) {
@@ -475,12 +475,12 @@ test("Challenges: each challenge has a category and serial unlocking works per c
     assert.equal(visibleInCat.length, 1, `Category ${cat} is untouched and still shows only 1 challenge`);
   }
 
-  // Solve challenge 3 (from Web category) as well
+  // Solve challenge 3 (from Web category) as well -> reveals all questions in Web category
   const afterSolve1And3 = getVisibleChallenges(challenges, new Set([1, 3]));
   const webVisible = afterSolve1And3.filter(c => c.category === "Web");
-  assert.equal(webVisible.length, 2, "Web category shows an additional challenge after solving 3");
-  assert.equal(webVisible[0].id, 3);
-  assert.equal(webVisible[1].id, 10);
+  const allWeb = challenges.filter(c => c.category === "Web");
+  assert.equal(webVisible.length, allWeb.length, "Web category shows all challenges after solving initial challenge 3");
+  assert.deepEqual(webVisible.map(c => c.id), [3, 10, 16, 23]);
 
   // Forensics should still show only 1
   const forensicsVisible = afterSolve1And3.filter(c => c.category === "Forensics");
@@ -1397,7 +1397,7 @@ test("Challenges 001-031: Clean URL resolution works for challenge pages without
   }
 });
 
-test("Challenges 001-031: Deep serial category unlocking works across multi-level progression", async () => {
+test("Challenges 001-031: Category unlock reveals all questions once the initial question is solved", async () => {
   const { challenges, getVisibleChallenges } = await import("../challenges.js");
   const forensicsChallenges = challenges.filter(c => c.category === "Forensics").map(c => c.id);
   assert.ok(forensicsChallenges.length >= 4, "Forensics has at least 4 challenges");
@@ -1407,20 +1407,15 @@ test("Challenges 001-031: Deep serial category unlocking works across multi-leve
   let visible = getVisibleChallenges(challenges, solved).filter(c => c.category === "Forensics").map(c => c.id);
   assert.deepEqual(visible, [forensicsChallenges[0]]);
 
-  // Step 1: Solve challenge 2 -> unlocks challenge 4
+  // Step 1: Solve challenge 2 (first question) -> reveals ALL Forensics challenges
   solved.add(forensicsChallenges[0]);
   visible = getVisibleChallenges(challenges, solved).filter(c => c.category === "Forensics").map(c => c.id);
-  assert.deepEqual(visible, [forensicsChallenges[0], forensicsChallenges[1]]);
+  assert.deepEqual(visible, forensicsChallenges, "All Forensics challenges revealed upon solving initial question");
 
-  // Step 2: Solve challenge 4 -> unlocks challenge 11
+  // Step 2: Solving subsequent questions preserves all Forensics challenges as visible
   solved.add(forensicsChallenges[1]);
   visible = getVisibleChallenges(challenges, solved).filter(c => c.category === "Forensics").map(c => c.id);
-  assert.deepEqual(visible, [forensicsChallenges[0], forensicsChallenges[1], forensicsChallenges[2]]);
-
-  // Step 3: Solve challenge 11 -> unlocks challenge 17
-  solved.add(forensicsChallenges[2]);
-  visible = getVisibleChallenges(challenges, solved).filter(c => c.category === "Forensics").map(c => c.id);
-  assert.deepEqual(visible, [forensicsChallenges[0], forensicsChallenges[1], forensicsChallenges[2], forensicsChallenges[3]]);
+  assert.deepEqual(visible, forensicsChallenges);
 });
 
 test("Challenges 001-031: Solves across diverse categories correctly award points and update leaderboards", async () => {
@@ -1996,7 +1991,7 @@ test("Challenges 032-042: Sensitive .server-private directory returns HTTP 403 F
   assert.equal(sqlFileRes.statusCode, 403, "Direct request to .server-private SQL file returns 403");
 });
 
-test("Challenges 032-042: Serial progression and solve verification in Digital Forensics (32 -> 36 -> 37)", async () => {
+test("Challenges 032-042: Category unlock and solve verification in Digital Forensics (32 unlocks 36 and 37)", async () => {
   await makeRequest("POST", "/admin/state", {
     "Content-Type": "application/json",
     "X-Admin-Token": TEST_ADMIN_TOKEN
@@ -2028,7 +2023,16 @@ test("Challenges 032-042: Serial progression and solve verification in Digital F
     });
     assert.equal(locked36.statusCode, 403, "Challenge 36 is locked prior to solving 32");
 
-    // Solve Challenge 32 (Digital Forensics, 150 base pts, 0 previous solves -> First Blood 130% = 195 pts)
+    const locked37 = await makeRequest("POST", "/solve", {
+      "Content-Type": "application/json",
+      "Cookie": cookie
+    }, {
+      challengeId: 37,
+      flag: "CTF{parcel_checked}"
+    });
+    assert.equal(locked37.statusCode, 403, "Challenge 37 is locked prior to solving 32");
+
+    // Solve Challenge 32 (Digital Forensics initial challenge, 150 base pts, 0 previous solves -> First Blood 130% = 195 pts)
     const solve32 = await makeRequest("POST", "/solve", {
       "Content-Type": "application/json",
       "Cookie": cookie
@@ -2044,17 +2048,21 @@ test("Challenges 032-042: Serial progression and solve verification in Digital F
     assert.equal(body32.pointsAwarded, 195);
     assert.equal(body32.totalPoints, 195);
 
-    // Challenge 37 should still be locked because 36 is next in category
-    const locked37 = await makeRequest("POST", "/solve", {
+    // Once Challenge 32 is solved, ALL challenges in Digital Forensics are unlocked!
+    // Solve Challenge 37 directly
+    const solve37 = await makeRequest("POST", "/solve", {
       "Content-Type": "application/json",
       "Cookie": cookie
     }, {
       challengeId: 37,
       flag: "CTF{parcel_checked}"
     });
-    assert.equal(locked37.statusCode, 403, "Challenge 37 is locked prior to solving 36");
+    assert.equal(solve37.statusCode, 200, "Challenge 37 is unlocked and solves successfully");
+    const body37 = JSON.parse(solve37.body);
+    assert.equal(body37.success, true);
+    assert.equal(body37.basePoints, 75);
 
-    // Solve Challenge 36 (Digital Forensics, 75 base pts, First Blood 130%)
+    // Solve Challenge 36 as well
     const solve36 = await makeRequest("POST", "/solve", {
       "Content-Type": "application/json",
       "Cookie": cookie
@@ -2066,19 +2074,6 @@ test("Challenges 032-042: Serial progression and solve verification in Digital F
     const body36 = JSON.parse(solve36.body);
     assert.equal(body36.success, true);
     assert.equal(body36.basePoints, 75);
-
-    // Now Challenge 37 is unlocked. Solve Challenge 37 (Digital Forensics, 75 base pts)
-    const solve37 = await makeRequest("POST", "/solve", {
-      "Content-Type": "application/json",
-      "Cookie": cookie
-    }, {
-      challengeId: 37,
-      flag: "CTF{parcel_checked}"
-    });
-    assert.equal(solve37.statusCode, 200, "Challenge 37 solve succeeds");
-    const body37 = JSON.parse(solve37.body);
-    assert.equal(body37.success, true);
-    assert.equal(body37.basePoints, 75);
 
     // Verify all 3 solves recorded in database
     const dbSolves = db.prepare("SELECT challenge_id FROM solves WHERE team_name = ? ORDER BY challenge_id").all(teamName);
@@ -2092,4 +2087,40 @@ test("Challenges 032-042: Serial progression and solve verification in Digital F
       "X-Admin-Token": TEST_ADMIN_TOKEN
     }, { layout: "wait" });
   }
+});
+
+test("Challenges: Category reveal shows initial question per category and all questions upon solve", async () => {
+  const { challenges, getVisibleChallenges } = await import("../challenges.js");
+
+  const categories = [...new Set(challenges.map(c => c.category || "General"))];
+  assert.equal(categories.length, 15, "15 distinct categories exist across all 42 challenges");
+
+  // Initial state: only 1st challenge per category
+  const initial = getVisibleChallenges(challenges, new Set());
+  assert.equal(initial.length, categories.length, "Initially reveals exactly 1 question per category (15 total)");
+  for (const cat of categories) {
+    const inCat = initial.filter(c => c.category === cat);
+    assert.equal(inCat.length, 1, `Category '${cat}' initially has exactly 1 visible question`);
+    const allInCat = challenges.filter(c => c.category === cat);
+    assert.equal(inCat[0].id, allInCat[0].id, `Category '${cat}' initially shows its first question`);
+  }
+
+  // Solve the first question in Linux Fundamentals (challenge 33)
+  const afterSolve33 = getVisibleChallenges(challenges, new Set([33]));
+  const linuxFundVisible = afterSolve33.filter(c => c.category === "Linux Fundamentals");
+  const linuxFundAll = challenges.filter(c => c.category === "Linux Fundamentals");
+  assert.equal(linuxFundVisible.length, linuxFundAll.length, "Linux Fundamentals reveals all 3 questions upon solving challenge 33");
+  assert.deepEqual(linuxFundVisible.map(c => c.id), [33, 34, 35]);
+
+  // Ensure all other 14 categories still show only 1 question
+  for (const cat of categories.filter(c => c !== "Linux Fundamentals")) {
+    const inCat = afterSolve33.filter(c => c.category === cat);
+    assert.equal(inCat.length, 1, `Category '${cat}' remains at 1 question`);
+  }
+
+  // Also solve Cryptography & Encoding (challenge 38)
+  const afterSolve33And38 = getVisibleChallenges(challenges, new Set([33, 38]));
+  const cryptoEncVisible = afterSolve33And38.filter(c => c.category === "Cryptography & Encoding");
+  assert.equal(cryptoEncVisible.length, 2, "Cryptography & Encoding reveals all questions upon solving challenge 38");
+  assert.deepEqual(cryptoEncVisible.map(c => c.id), [38, 39]);
 });

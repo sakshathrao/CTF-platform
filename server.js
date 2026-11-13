@@ -1775,7 +1775,7 @@ const server =
                         403,
                         {
                             error:
-                                "Challenge is locked. You must solve preceding challenges in this category first."
+                                "Challenge is locked. You must solve the initial challenge in this category first."
                         }
                     );
 

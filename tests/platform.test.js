@@ -2124,3 +2124,83 @@ test("Challenges: Category reveal shows initial question per category and all qu
   assert.equal(cryptoEncVisible.length, 2, "Cryptography & Encoding reveals all questions upon solving challenge 38");
   assert.deepEqual(cryptoEncVisible.map(c => c.id), [38, 39]);
 });
+
+test("Challenges 032-042: Full end-to-end solve of all 11 challenges verifies flags, unlocking, and scoring", async () => {
+  const { challenges } = await import("../challenges.js");
+  const { CHALLENGE_FLAGS_032_042 } = await import("../.server-private/challenge_flags_032_042.js");
+
+  const teamName = `FullVMTestTeam_${Date.now()}`;
+  const registerRes = await makeRequest("POST", "/register", {
+    "Content-Type": "application/json"
+  }, {
+    teamName,
+    password: "Password123!",
+    members: [{ name: "VM Lead", usn: `VM${Date.now().toString().slice(-8)}` }]
+  });
+  assert.equal(registerRes.statusCode, 201, "Registration succeeds");
+
+  const cookie = registerRes.headers["set-cookie"]?.[0]?.split(";")[0];
+  assert.ok(cookie, "Session cookie received");
+
+  // Put event in start state
+  await makeRequest("POST", "/admin/state", {
+    "Content-Type": "application/json",
+    "X-Admin-Token": TEST_ADMIN_TOKEN
+  }, { layout: "start" });
+
+  try {
+    // Solve each challenge 32-42 in valid category unlock order
+    // Order:
+    // Digital Forensics: 32 (initial) -> 36, 37
+    // Linux Fundamentals: 33 (initial) -> 34, 35
+    // Cryptography & Encoding: 38 (initial) -> 39
+    // Network Forensics: 40
+    // Reverse Engineering & Shell Debugging: 41
+    // Linux Process Investigation: 42
+    const solveOrder = [32, 36, 37, 33, 34, 35, 38, 39, 40, 41, 42];
+
+    let totalPointsAccumulated = 0;
+    for (const id of solveOrder) {
+      if (rateLimitMap) rateLimitMap.delete("solve:" + teamName);
+      const flagEntry = CHALLENGE_FLAGS_032_042.find(f => f.id === id);
+      assert.ok(flagEntry, `Flag entry for challenge ${id} exists`);
+
+      const chDef = challenges.find(c => c.id === id);
+      assert.ok(chDef, `Registry entry for challenge ${id} exists`);
+
+      const solveRes = await makeRequest("POST", "/solve", {
+        "Content-Type": "application/json",
+        "Cookie": cookie
+      }, {
+        challengeId: id,
+        flag: flagEntry.flag
+      });
+
+      assert.equal(solveRes.statusCode, 200, `Challenge ${id} (${chDef.title}) solve returns HTTP 200`);
+      const body = JSON.parse(solveRes.body);
+      assert.equal(body.success, true, `Challenge ${id} body.success is true`);
+      assert.equal(body.basePoints, chDef.points, `Challenge ${id} base points match registry (${chDef.points})`);
+      assert.ok(body.pointsAwarded >= chDef.points, `Challenge ${id} awarded points is at least base points`);
+      totalPointsAccumulated = body.totalPoints;
+    }
+
+    assert.ok(totalPointsAccumulated > 0, "Total points accumulated is positive");
+
+    // Verify all 11 challenges recorded in solves table
+    const dbSolves = db.prepare("SELECT challenge_id FROM solves WHERE team_name = ? ORDER BY challenge_id").all(teamName);
+    const solvedIds = dbSolves.map(r => r.challenge_id);
+    assert.deepEqual(solvedIds, [32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42], "All 11 challenges (32-42) successfully recorded in database solves");
+
+    // Verify team points in teams table match accumulated points
+    const teamRow = db.prepare("SELECT points FROM teams WHERE name = ?").get(teamName);
+    assert.equal(teamRow.points, totalPointsAccumulated, "Team table points match solve accumulated points");
+  } finally {
+    db.prepare("DELETE FROM solves WHERE team_name = ?").run(teamName);
+    db.prepare("DELETE FROM sessions WHERE team_name = ?").run(teamName);
+    db.prepare("DELETE FROM teams WHERE name = ?").run(teamName);
+    await makeRequest("POST", "/admin/state", {
+      "Content-Type": "application/json",
+      "X-Admin-Token": TEST_ADMIN_TOKEN
+    }, { layout: "wait" });
+  }
+});

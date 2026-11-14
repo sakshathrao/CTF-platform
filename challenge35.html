@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -17,7 +18,9 @@
       --success: #4ade80;
     }
 
-    * { box-sizing: border-box; }
+    * {
+      box-sizing: border-box;
+    }
 
     body {
       margin: 0;
@@ -123,10 +126,10 @@
     .submit-card {
       background: linear-gradient(180deg, rgba(13, 21, 30, 0.86) 0%, rgba(10, 16, 24, 0.92) 100%);
       backdrop-filter: blur(16px) saturate(260%) brightness(0.75);
-      -webkit-backdrop-filter: blur(16px) saturate(260%) brightness(0.75);
       border: 1px solid var(--line);
       border-radius: 15px;
       box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
+      background: #00000030;
     }
 
     .case-card {
@@ -213,7 +216,7 @@
       cursor: text;
     }
 
-    #screen_container > div {
+    #screen_container>div {
       white-space: pre;
       font: 14px/1.25 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     }
@@ -353,12 +356,14 @@
       .vm-layout {
         grid-template-columns: 1fr;
       }
+
       #screen_container {
         min-height: 350px;
       }
     }
   </style>
 </head>
+
 <body>
   <header id="ctfNavbar" class="navbar" style="display: none;">
     <div class="navLeft">
@@ -386,8 +391,9 @@
     <h1small>This form isn't accepting <br> responses right now.</h1small>
   </div>
 
-  <script>window.NP_VM_CHALLENGE = {"id":35,"title":"The Broken Shortcut","category":"Linux Fundamentals","difficulty":"Easy","points":75,"summary":"A shortcut on a recovered workstation points to a report. Inspect the link and open its target to recover the handover token.","objective":"Identify where the CURRENT shortcut points, then read the target report and submit its token.","iso":"/challenges/vm_035/challenge35.iso"};</script>
+  <script>window.NP_VM_CHALLENGE = {"id": 35, "title": "The Broken Shortcut", "category": "Linux Fundamentals", "difficulty": "Easy", "points": 75, "summary": "A shortcut on a recovered workstation points to a report. Inspect the link and open its target to recover the handover token.", "objective": "Identify where the CURRENT shortcut points, then read the target report and submit its token.", "iso": "/challenges/vm_035/challenge35.iso"};</script>
   <script src="/node_modules/v86/build/libv86.js"></script>
   <script src="/dynamic-vm/common.js"></script>
 </body>
+
 </html>
